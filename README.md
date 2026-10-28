@@ -20,7 +20,7 @@ The free plan includes monthly usage credit, so you can try every tool here with
   "mcpServers": {
     "lergassy-agent-tools": {
       "command": "npx",
-      "args": ["-y", "lergassy-agent-tools"],
+      "args": ["-y", "github:lergassy/lergassy-agent-tools"],
       "env": { "APIFY_TOKEN": "apify_api_..." }
     }
   }
@@ -29,7 +29,9 @@ The free plan includes monthly usage credit, so you can try every tool here with
 
 ### Cursor, Windsurf, Gemini CLI, any MCP client
 
-Same three lines: command `npx`, args `-y lergassy-agent-tools`, env `APIFY_TOKEN`.
+Same three lines: command `npx`, args `-y github:lergassy/lergassy-agent-tools`, env `APIFY_TOKEN`.
+
+Not on npm yet — install straight from this repository, which is what the command above does.
 
 ## Settings
 
