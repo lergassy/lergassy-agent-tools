@@ -1,0 +1,12 @@
+{
+  "name": "lergassy-agent-tools",
+  "version": "0.1.0",
+  "description": "One MCP server pinning the Apify Actors of lergassy and BlueskyScraper: flights and hotels, Threads and LinkedIn, Shopee, Lazada, Tokopedia, 1688 and Mercado Libre, TikTok Shop, Zillow, US business filings, speech-to-text. Pay per delivered row, nothing on an empty answer.",
+  "type": "module",
+  "bin": { "lergassy-agent-tools": "src/index.js" },
+  "files": ["src", "README.md"],
+  "scripts": { "sync": "node scripts/generate-tools.mjs", "start": "node src/index.js" },
+  "keywords": ["mcp", "mcp-server", "apify", "agent-skills", "claude-code-plugin", "gemini-cli-extension", "scraping", "flights", "ecommerce", "linkedin", "transcription"],
+  "license": "MIT",
+  "dependencies": { "@modelcontextprotocol/sdk": "^1.0.0" }
+}

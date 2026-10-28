@@ -1,0 +1,4305 @@
+[
+ {
+  "name": "google-flights-scraper",
+  "actor": "lergassy~google-flights-scraper",
+  "description": "Google Flights Scraper 💰$1/1K — Fares, Calendar & Booking. [$1/1K rows] Google Flights scraper: fares, the full 100-150 itinerary list, price calendar up to a year, Explore destinations, layovers, CO2, booking options with seller links. Round trip, multi-city, batch routes. 50,000 flights = $50, no run or search fee.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "origin": {
+     "type": "string",
+     "description": "🛫 Origin airport (IATA) — Required unless you fill `routes` or `multiCityLegs`. Departure airport code, e.g. DPS (Bali), CGK (Jakarta), SIN (Singapore), LHR (London)"
+    },
+    "destination": {
+     "type": "string",
+     "description": "🛬 Destination airport (IATA) — Arrival airport code, e.g. SIN (Singapore), BKK (Bangkok), SYD (Sydney). Ignored when Explore is on."
+    },
+    "departureDate": {
+     "type": "string",
+     "description": "📅 Departure date — Format YYYY-MM-DD Leave the whole route empty and the Actor runs a demo search so a first run always returns rows."
+    },
+    "returnDate": {
+     "type": "string",
+     "description": "Return date (optional) — Leave empty for one-way. Format YYYY-MM-DD. Round-trip prices are the total for both directions."
+    },
+    "adults": {
+     "type": "integer",
+     "description": "👤 Adults — Passengers aged 12 and over (1–9). Prices are the total for all passengers.",
+     "default": 1
+    },
+    "children": {
+     "type": "integer",
+     "description": "Children (2–11) — Passengers aged 2 to 11. Google applies child fares where the airline offers them.",
+     "default": 0
+    },
+    "infantsInSeat": {
+     "type": "integer",
+     "description": "Infants in seat — Under 2 years old, with their own seat (charged as a child fare on most airlines).",
+     "default": 0
+    },
+    "infantsOnLap": {
+     "type": "integer",
+     "description": "Infants on lap — Under 2 years old, travelling on an adult's lap (usually ~10% of the adult fare).",
+     "default": 0
+    },
+    "cabinClass": {
+     "type": "string",
+     "description": "💺 Cabin class — Economy, premium economy, business or first",
+     "enum": [
+      "economy",
+      "premium_economy",
+      "business",
+      "first"
+     ],
+     "default": "economy"
+    },
+    "maxStops": {
+     "type": "string",
+     "description": "🔀 Max stops — any, 0 nonstop only, 1 up to one stop, 2 up to two stops",
+     "enum": [
+      "any",
+      "0",
+      "1",
+      "2"
+     ],
+     "default": "any"
+    },
+    "currency": {
+     "type": "string",
+     "description": "💱 Currency — ISO code for prices: USD, IDR, EUR, SGD, AUD…",
+     "default": "USD"
+    },
+    "market": {
+     "type": "string",
+     "description": "🌐 Market (country of sale) — Two-letter country code of the point of sale, e.g. US, ID, GB, DE, AU. Google returns the fares, sellers and booking links available to buyers in that country — prices differ by market. Leave empty for Google's default."
+    },
+    "maxResults": {
+     "type": "integer",
+     "description": "💯 Max flights per route — Google returns up to ~150 itineraries per search",
+     "default": 100
+    },
+    "sortBy": {
+     "type": "string",
+     "description": "↕️ Sort by — Google's own ranking (best), or by price, duration or departure time",
+     "enum": [
+      "best",
+      "price",
+      "duration",
+      "departure"
+     ],
+     "default": "best"
+    },
+    "calendarDays": {
+     "type": "integer",
+     "description": "📆 Price calendar (days) — Lowest fare for each departure date over this many days starting at the departure date — Google's date grid as data. 0 = off, 60 = two months, up to 365. One request per 90 days. Adds calendar_day items and a calendar.cheapestDates summary to the search item. For round tri",
+     "default": 0
+    },
+    "resolveBookingOptions": {
+     "type": "boolean",
+     "description": "🎫 Booking options (who sells it, at what price, with a link) — For the top flights of each search, fetch Google's booking options: airline and travel agencies (Trip.com, Expedia, Kiwi…), their prices, fees, and a deep link to book. Round trips need Return flights on — options are fetched for the ou",
+     "default": false
+    },
+    "fillMissingPricesFromKayak": {
+     "type": "boolean",
+     "description": "💸 Fill missing prices from KAYAK — Some airlines keep fares off Google Flights (e.g. Saudia on Saudi domestic routes), so those flights come with no price. Tick this to run our KAYAK Flights Scraper for the same search and copy KAYAK's price onto the same flight. Filled rows carry priceSource: \"kay",
+     "default": false
+    },
+    "resolveReturnFlights": {
+     "type": "boolean",
+     "description": "🔁 Return flights for round trips — For the top outbound itineraries of a round trip, fetch Google's list of return flights — each with the total price for both directions — so you get complete outbound + return combinations. One extra request per outbound itinerary.",
+     "default": false
+    },
+    "exploreAnywhere": {
+     "type": "boolean",
+     "description": "🌍 Explore: cheapest destinations from the origin — Instead of a fixed route, list the cheapest destinations Google suggests from Origin — city, country, price, airline, stops, duration and suggested dates. Uses Departure/Return date when set, otherwise Google's flexible one-week trips over the comi",
+     "default": false
+    },
+    "routes": {
+     "type": "array",
+     "description": "🗺️ More routes (batch) — Search many routes in one run. Each item: {\"origin\": \"DPS\", \"destination\": \"BKK\", \"departureDate\": \"2026-10-15\", \"returnDate\": \"2026-10-22\"} (returnDate optional). Passengers, cabin and filters below apply to every route.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "multiCityLegs": {
+     "type": "array",
+     "description": "🧭 Multi-city legs — A multi-city trip as a list of legs: {\"origin\": \"SIN\", \"destination\": \"BKK\", \"date\": \"2026-10-15\"}, {\"origin\": \"BKK\", \"destination\": \"HKT\", \"date\": \"2026-10-19\"}, {\"origin\": \"HKT\", \"destination\": \"SIN\", \"date\": \"2026-10-23\"}. Google prices the trip leg by leg; the Actor resolves",
+     "items": {
+      "type": "string"
+     }
+    },
+    "airlines": {
+     "type": "array",
+     "description": "Only these airlines — IATA airline codes to keep, e.g. SQ, GA, QZ. Leave empty for all.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "excludeAirlines": {
+     "type": "array",
+     "description": "Exclude airlines — IATA airline codes to drop, e.g. TR (Scoot)",
+     "items": {
+      "type": "string"
+     }
+    },
+    "maxPrice": {
+     "type": "integer",
+     "description": "Max price — Drop flights above this price (in the selected currency)"
+    },
+    "maxDurationMinutes": {
+     "type": "integer",
+     "description": "Max total duration (minutes) — Drop itineraries longer than this, e.g. 720 for 12 hours"
+    },
+    "maxLayoverMinutes": {
+     "type": "integer",
+     "description": "Max layover (minutes) — Drop itineraries with any layover longer than this, e.g. 180"
+    },
+    "departureTimeFrom": {
+     "type": "string",
+     "description": "Depart after (HH:MM) — Earliest departure time, local, e.g. 06:00"
+    },
+    "departureTimeTo": {
+     "type": "string",
+     "description": "Depart before (HH:MM) — Latest departure time, local, e.g. 12:00"
+    },
+    "arrivalTimeFrom": {
+     "type": "string",
+     "description": "Arrive after (HH:MM) — Earliest arrival time, local, e.g. 08:00"
+    },
+    "arrivalTimeTo": {
+     "type": "string",
+     "description": "Arrive before (HH:MM) — Latest arrival time, local, e.g. 22:00"
+    },
+    "language": {
+     "type": "string",
+     "description": "Language — Language of airport and airline names, e.g. en, id, de",
+     "default": "en"
+    },
+    "calendarOnly": {
+     "type": "boolean",
+     "description": "Calendar only (skip the flight list) — Return just the price calendar and the search summary — the cheapest way to sweep dates or routes.",
+     "default": false
+    },
+    "includePriceInsights": {
+     "type": "boolean",
+     "description": "Price insights — Add Google's price level (low / typical / high), typical price range and 60-day price history to the search summary and to every flight",
+     "default": true
+    },
+    "includeSearchSummary": {
+     "type": "boolean",
+     "description": "🧾 Add the search summary row — Adds one type: \"search\" row per search with how many itineraries Google had, its own lowest price, the price level and the price history. It is not a flight, so it is off by default and the table stays flights only — the same summary is always saved as the run's SEARC",
+     "default": false
+    },
+    "maxDestinations": {
+     "type": "integer",
+     "description": "Max destinations (explore) — How many destinations to return in Explore mode, cheapest first.",
+     "default": 60
+    },
+    "maxBookingResolutions": {
+     "type": "integer",
+     "description": "Flights to resolve booking options for — Per search, counted from the top of the sorted list",
+     "default": 10
+    },
+    "maxReturnResolutions": {
+     "type": "integer",
+     "description": "Outbound itineraries to resolve returns for — Per round-trip search, counted from the top of the sorted list",
+     "default": 10
+    },
+    "maxReturnOptions": {
+     "type": "integer",
+     "description": "Return flights to keep per outbound — How many return flights to keep for each outbound itinerary, cheapest first.",
+     "default": 20
+    },
+    "maxMultiCityResolutions": {
+     "type": "integer",
+     "description": "Multi-city itineraries to resolve — How many first-leg options to follow through all legs (one request per leg each)",
+     "default": 5
+    },
+    "dataSource": {
+     "type": "string",
+     "description": "Data source — Auto: Google's results API (full list of 100–150 itineraries, needs a residential proxy) with automatic fallback to the results page (first ~40 itineraries, works from any IP). Results API only: more retries on fresh IPs; if Google still refuses, the route falls back to the results pag",
+     "enum": [
+      "auto",
+      "api",
+      "page"
+     ],
+     "default": "auto"
+    },
+    "proxyConfiguration": {
+     "type": "object",
+     "description": "Proxy configuration — Google serves the full results API only to residential IPs — keep Residential proxies for complete results (a search transfers ~250 KB, a fraction of a cent). Datacenter proxies still work through the page fallback with the first ~15 itineraries.",
+     "default": {
+      "useApifyProxy": true,
+      "apifyProxyGroups": [
+       "RESIDENTIAL"
+      ]
+     },
+     "additionalProperties": true
+    },
+    "includeRunSummary": {
+     "type": "boolean",
+     "description": "🧾 Add a free summary row at the end of the run — One extra free row with the run's totals: rows delivered, free rows, what was charged and how much in US dollars. It carries type \"notice\", so a filter on your data rows skips it.",
+     "default": true
+    }
+   },
+   "required": []
+  }
+ },
+ {
+  "name": "kayak-flights-scraper",
+  "actor": "lergassy~kayak-flights-scraper",
+  "description": "Kayak Flights Scraper — $0.70/1K rows, fares & sellers. Scrape flight prices from KAYAK by route and dates: price per booking provider, airline, flight numbers, times, duration, stops and layovers, aircraft and a direct booking link. One-way and round trip, batch routes, all cabins.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "origin": {
+     "type": "string",
+     "description": "🛫 Origin airport (IATA) — Required unless you fill `routes`. Departure airport code, e.g. DPS (Bali), JFK (New York), LHR (London)"
+    },
+    "destination": {
+     "type": "string",
+     "description": "🛬 Destination airport (IATA) — Arrival airport code, e.g. SIN (Singapore), BKK (Bangkok)"
+    },
+    "site": {
+     "type": "string",
+     "description": "🌐 Site — Which metasearch to read. KAYAK and Momondo are the same engine with different partner mixes, so prices can differ.",
+     "enum": [
+      "kayak",
+      "momondo"
+     ],
+     "default": "kayak"
+    },
+    "departureDate": {
+     "type": "string",
+     "description": "📅 Departure date — Format YYYY-MM-DD. Leave the route empty and the Actor runs a demo search, so a first run always returns rows."
+    },
+    "returnDate": {
+     "type": "string",
+     "description": "📅 Return date (round trip) — Format YYYY-MM-DD. Leave empty for a one-way search. Round-trip prices are the total for both directions."
+    },
+    "adults": {
+     "type": "integer",
+     "description": "👤 Adults — Number of adult passengers",
+     "default": 1
+    },
+    "children": {
+     "type": "integer",
+     "description": "🧒 Children — Passengers aged 2–11",
+     "default": 0
+    },
+    "cabinClass": {
+     "type": "string",
+     "description": "💺 Cabin class — Fare class to search",
+     "enum": [
+      "economy",
+      "premium",
+      "business",
+      "first"
+     ],
+     "default": "economy"
+    },
+    "sortBy": {
+     "type": "string",
+     "description": "↕️ Sort by — How KAYAK orders the results before they are read",
+     "enum": [
+      "best",
+      "price",
+      "duration"
+     ],
+     "default": "best"
+    },
+    "maxResults": {
+     "type": "integer",
+     "description": "💯 Max flights per search — KAYAK returns 50 per page; more pages are loaded until this many rows are collected",
+     "default": 50
+    },
+    "maxStops": {
+     "type": "string",
+     "description": "🛑 Max stops — Drop itineraries with more stops than this",
+     "enum": [
+      "any",
+      "0",
+      "1",
+      "2"
+     ],
+     "default": "any"
+    },
+    "currency": {
+     "type": "string",
+     "description": "💱 Currency — Three-letter code, e.g. USD, EUR, GBP",
+     "default": "USD"
+    },
+    "allProviders": {
+     "type": "boolean",
+     "description": "🏷️ One row per booking provider — Off: one row per itinerary with the cheapest provider. On: one row for every provider selling that itinerary (agency, airline) with its own price and link.",
+     "default": false
+    },
+    "routes": {
+     "type": "array",
+     "description": "🗺️ More routes (batch) — Search many routes in one run. Each item: {\"origin\": \"DPS\", \"destination\": \"BKK\", \"departureDate\": \"2027-03-15\", \"returnDate\": \"2027-03-22\"}",
+     "items": {
+      "type": "string"
+     }
+    },
+    "proxyConfiguration": {
+     "type": "object",
+     "description": "🌐 Proxy — Proxy used to reach KAYAK. The default works; residential helps on hard routes.",
+     "default": {
+      "useApifyProxy": true
+     },
+     "additionalProperties": true
+    }
+   },
+   "required": []
+  }
+ },
+ {
+  "name": "booking-hotels-scraper",
+  "actor": "lergassy~booking-hotels-scraper",
+  "description": "Booking.com Hotel Search Scraper — Rooms, Rates, Reviews. Scrape Booking.com hotel search: nightly and total prices for your dates, every room and rate with cancellation terms, guest reviews, facilities and a year of availability. Hotel search data for any destination, no login.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "mode": {
+     "type": "string",
+     "description": "🧭 What to get — Search — properties for a destination and dates with prices. Hotel — one property in full: every room and rate for your dates, facilities, review scores, photos, child policy. Reviews — guest reviews of a property. Calendar — the price of every day ahead for a property.",
+     "enum": [
+      "search",
+      "hotel",
+      "reviews",
+      "calendar"
+     ],
+     "default": "search"
+    },
+    "destination": {
+     "type": "string",
+     "description": "📍 Destination — City, region, landmark or hotel name as you would type it on Booking.com, e.g. Bali, Paris, Canggu. Leave empty and paste search URLs below instead."
+    },
+    "hotelUrls": {
+     "type": "array",
+     "description": "🏨 Hotel URLs or ids (hotel, reviews, calendar modes) — Booking.com property pages, e.g. https://www.booking.com/hotel/id/the-magani-amp-spa.html, or numeric hotel ids from the hotelId field of search rows.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "checkin": {
+     "type": "string",
+     "description": "📅 Check-in — YYYY-MM-DD. Prices exist only for concrete dates; leave empty for a stay 30 days from today."
+    },
+    "checkout": {
+     "type": "string",
+     "description": "📅 Check-out — YYYY-MM-DD. Leave empty for two nights."
+    },
+    "adults": {
+     "type": "integer",
+     "description": "👤 Adults — Guests aged 18 and over, across all rooms.",
+     "default": 2
+    },
+    "childrenAges": {
+     "type": "array",
+     "description": "🧒 Children's ages — One age per child, e.g. 6, 12. Child prices and free-stay rules depend on age.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "rooms": {
+     "type": "integer",
+     "description": "🛏️ Rooms — Number of rooms.",
+     "default": 1
+    },
+    "currency": {
+     "type": "string",
+     "description": "💱 Currency — ISO code for prices: USD, EUR, IDR, GBP, AUD… Every row also carries the price in the hotel's own currency.",
+     "default": "USD"
+    },
+    "sortBy": {
+     "type": "string",
+     "description": "↕️ Sort by — Booking.com's own orderings.",
+     "enum": [
+      "top_picks",
+      "price",
+      "review_score",
+      "stars",
+      "distance",
+      "popularity"
+     ],
+     "default": "top_picks"
+    },
+    "maxResults": {
+     "type": "integer",
+     "description": "💯 Maximum properties — Per run, across all destinations and URLs. Booking.com serves at most 1,000 properties per search — narrow with filters to reach the rest.",
+     "default": 50
+    },
+    "includeRooms": {
+     "type": "boolean",
+     "description": "🛏️ Add every room and rate to search results ($) — For the first properties of the search (see the cap below), fetch the full room list with all rates, cancellation policies and meal plans — the same rows as Hotel mode. One extra request per property.",
+     "default": false
+    },
+    "includeHotelDetails": {
+     "type": "boolean",
+     "description": "ℹ️ Add facilities and review scores to search results ($) — For the first properties of the search, fetch the facilities list, spoken languages and the review score breakdown (staff, cleanliness, location, value…). Two extra requests per property.",
+     "default": false
+    },
+    "maxHotelsToEnrich": {
+     "type": "integer",
+     "description": "Properties to enrich — How many search results get rooms / details when the options above are on.",
+     "default": 10
+    },
+    "propertyTypes": {
+     "type": "array",
+     "description": "🏨 Property types — Keep only these kinds of places. Empty = everything.",
+     "items": {
+      "type": "string",
+      "enum": [
+       "hotel",
+       "apartment",
+       "villa",
+       "resort",
+       "guest_house",
+       "bed_and_breakfast",
+       "hostel",
+       "holiday_home",
+       "homestay",
+       "aparthotel",
+       "motel",
+       "lodge",
+       "chalet",
+       "campsite",
+       "capsule_hotel",
+       "farm_stay",
+       "luxury_tent",
+       "boat"
+      ],
+      "enumTitles": [
+       "Hotels",
+       "Apartments",
+       "Villas",
+       "Resorts",
+       "Guest houses",
+       "Bed and breakfasts",
+       "Hostels",
+       "Holiday homes",
+       "Homestays",
+       "Aparthotels",
+       "Motels",
+       "Lodges",
+       "Chalets",
+       "Campsites",
+       "Capsule hotels",
+       "Farm stays",
+       "Luxury tents",
+       "Boats"
+      ]
+     }
+    },
+    "minStars": {
+     "type": "integer",
+     "description": "⭐ Minimum stars — 1–5. Keeps properties with this star class or higher."
+    },
+    "minReviewScore": {
+     "type": "number",
+     "description": "💬 Minimum review score — Guest score on Booking.com's 10-point scale: 8 for Very good, 9 for Wonderful."
+    },
+    "freeCancellationOnly": {
+     "type": "boolean",
+     "description": "↩️ Free cancellation only — Only rooms that can be cancelled for free.",
+     "default": false
+    },
+    "breakfastIncluded": {
+     "type": "boolean",
+     "description": "🍳 Breakfast included only — Only rates with breakfast.",
+     "default": false
+    },
+    "minPricePerNight": {
+     "type": "number",
+     "description": "💵 Minimum price per night — In the selected currency."
+    },
+    "maxPricePerNight": {
+     "type": "number",
+     "description": "💵 Maximum price per night — In the selected currency."
+    },
+    "rawFilters": {
+     "type": "string",
+     "description": "🧩 Extra Booking.com filters (nflt) — Any filter string from a Booking.com URL's nflt parameter, e.g. hotelfacility=4;roomfacility=11 (pool, air conditioning). Combined with the filters above."
+    },
+    "reviewsSortBy": {
+     "type": "string",
+     "description": "💬 Reviews order — Reviews mode.",
+     "enum": [
+      "most_relevant",
+      "newest",
+      "oldest",
+      "highest_score",
+      "lowest_score"
+     ],
+     "default": "most_relevant"
+    },
+    "reviewsGuestType": {
+     "type": "string",
+     "description": "💬 Reviewer type — Keep only reviews from this kind of guest.",
+     "enum": [
+      "ALL",
+      "FAMILIES",
+      "COUPLES",
+      "GROUP_OF_FRIENDS",
+      "SOLO_TRAVELLERS",
+      "BUSINESS_TRAVELLERS"
+     ],
+     "default": "ALL"
+    },
+    "reviewsLanguage": {
+     "type": "string",
+     "description": "💬 Reviews language — Two-letter code to keep only reviews written in that language, e.g. en, de, ru. Empty = all languages."
+    },
+    "maxReviewsPerHotel": {
+     "type": "integer",
+     "description": "💬 Reviews per hotel — Newest, most relevant or by score depending on the order; Booking serves 25 per page.",
+     "default": 100
+    },
+    "calendarDays": {
+     "type": "integer",
+     "description": "📆 Calendar days ahead — Calendar mode: how many days from the check-in date to price (up to 365). One request per 61 days.",
+     "default": 90
+    },
+    "startUrls": {
+     "type": "array",
+     "description": "🔗 Booking.com search URLs — Paste search-result URLs from the site with your own dates, guests, sorting and filters — each becomes a search. Used together with or instead of Destination.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "destinationId": {
+     "type": "string",
+     "description": "Destination id — Booking.com dest_id when you already know it (skips the name lookup). Needs Destination type."
+    },
+    "destinationType": {
+     "type": "string",
+     "description": "Destination type — city, region, district, landmark, airport, hotel or country — the dest_type that goes with the id."
+    },
+    "language": {
+     "type": "string",
+     "description": "Language — Language of names, room titles and labels, as a Booking.com locale: en-us, en-gb, de, fr, es, ru, id…",
+     "default": "en-us"
+    },
+    "onlyNewRowsStore": {
+     "type": "string",
+     "description": "🔁 Only new rows — memory name — Give this run a name — my-properties-watch — and the Actor remembers every propertie row it delivered under that name. Every later run with the same name writes and charges only rows you have not received before. Schedule the Actor daily to get a feed of new properti"
+    },
+    "proxyConfiguration": {
+     "type": "object",
+     "description": "Proxy configuration — Apify datacenter proxies by default. If runs end with bot-check error rows, switch to Residential — a page of 25 properties transfers about 90 KB.",
+     "default": {
+      "useApifyProxy": true
+     },
+     "additionalProperties": true
+    }
+   },
+   "required": []
+  }
+ },
+ {
+  "name": "agoda-reviews-scraper",
+  "actor": "lergassy~agoda-reviews-scraper",
+  "description": "Agoda Reviews Scraper 💰$3/1K — Hotel Guest Reviews & Ratings. Scrape hotel guest reviews and ratings from Agoda, including the Booking.com review pool on the same page: rating, text, traveler type, room booked, length of stay, reviewer country and date, plus live room prices. Hotel review data for any property.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "startUrls": {
+     "type": "array",
+     "description": "🏨 Agoda hotel URLs — Paste one or more links to hotel pages on Agoda.com — open a hotel there and copy the address from your browser. Example: https://www.agoda.com/the-magani-hotel-and-spa/hotel/bali-id.html",
+     "default": [
+      "https://www.agoda.com/the-magani-hotel-and-spa/hotel/bali-id.html"
+     ],
+     "items": {
+      "type": "string"
+     }
+    },
+    "mode": {
+     "type": "string",
+     "description": "What to scrape — Hotel info, reviews, or both. \"Hotel info + reviews\" writes two kinds of row into one dataset, so columns that belong to the other kind stay empty — pick it only if you want both in one export.",
+     "enum": [
+      "reviews",
+      "hotel",
+      "both",
+      "rooms"
+     ],
+     "default": "reviews"
+    },
+    "includeRooms": {
+     "type": "boolean",
+     "description": "🛏️ Room rates and availability ($) — Fetch the rooms on sale for your dates: room name, size, bedding, occupancy, breakfast, cancellation terms and the nightly price. Charged per offer returned.",
+     "default": false
+    },
+    "checkIn": {
+     "type": "string",
+     "description": "📅 Check-in — First night of the stay, YYYY-MM-DD. Leave empty and the Actor prices a stay 30 days out, which is what most rate checks want."
+    },
+    "checkOut": {
+     "type": "string",
+     "description": "📅 Check-out — Last day of the stay, YYYY-MM-DD. Leave empty to use the number of nights below."
+    },
+    "nights": {
+     "type": "integer",
+     "description": "Nights — Used when only a check-in date is given.",
+     "default": 1
+    },
+    "adults": {
+     "type": "integer",
+     "description": "Adults — Guests to price the room for.",
+     "default": 2
+    },
+    "children": {
+     "type": "integer",
+     "description": "Children — Number of children in the room.",
+     "default": 0
+    },
+    "childrenAges": {
+     "type": "array",
+     "description": "Children's ages — One age per child. Agoda prices some rooms differently by age.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "roomsWanted": {
+     "type": "integer",
+     "description": "Rooms — How many rooms the stay needs.",
+     "default": 1
+    },
+    "currency": {
+     "type": "string",
+     "description": "💱 Currency — Currency for the prices.",
+     "enum": [
+      "USD",
+      "EUR",
+      "GBP",
+      "AUD",
+      "NZD",
+      "SGD",
+      "HKD",
+      "MYR",
+      "THB",
+      "IDR",
+      "KRW"
+     ],
+     "default": "USD"
+    },
+    "reviewsProvider": {
+     "type": "string",
+     "description": "Review source — Which review feed to read. Agoda shows guest reviews from its own site and from Booking.com, and it genuinely serves the same review under both — so picking one or the other changes the order and the mix, not always the whole set, and a review can appear in either. With All each revi",
+     "enum": [
+      "agoda",
+      "booking",
+      "all"
+     ],
+     "default": "all"
+    },
+    "reviewLanguages": {
+     "type": "array",
+     "description": "🌐 Review languages — Reviews come back in whatever language they were written in, whichever option you pick here — this is not a translation setting. Each language edition of Agoda orders the review pool differently, so walking a second edition picks up rows the first walk was cut short of, worth a",
+     "default": [
+      "en-us",
+      "ja-jp",
+      "zh-cn",
+      "zh-tw",
+      "ko-kr",
+      "id-id",
+      "th-th",
+      "vi-vn",
+      "ms-my",
+      "ru-ru",
+      "de-de",
+      "fr-fr",
+      "es-es",
+      "it-it",
+      "nl-nl",
+      "pt-pt",
+      "ar-ae",
+      "tr-tr"
+     ],
+     "items": {
+      "type": "string",
+      "enum": [
+       "en-us",
+       "ja-jp",
+       "zh-cn",
+       "zh-tw",
+       "ko-kr",
+       "id-id",
+       "th-th",
+       "vi-vn",
+       "ms-my",
+       "ru-ru",
+       "de-de",
+       "fr-fr",
+       "es-es",
+       "it-it",
+       "nl-nl",
+       "pt-pt",
+       "ar-ae",
+       "tr-tr"
+      ],
+      "enumTitles": [
+       "English",
+       "Japanese",
+       "Chinese (Simplified)",
+       "Chinese (Traditional)",
+       "Korean",
+       "Indonesian",
+       "Thai",
+       "Vietnamese",
+       "Malay",
+       "Russian",
+       "German",
+       "French",
+       "Spanish",
+       "Italian",
+       "Dutch",
+       "Portuguese",
+       "Arabic",
+       "Turkish"
+      ]
+     }
+    },
+    "maxReviewsPerHotel": {
+     "type": "integer",
+     "description": "💯 Max reviews per hotel — How many reviews to return for each hotel, counted across both review sources together. The same review is never written twice, so picking both sources gives you a wider pool to fill this number from, not a doubled bill. The default of 18 keeps a first trial run at about $",
+     "default": 18
+    },
+    "maxResults": {
+     "type": "integer",
+     "description": "🧾 Max results for the whole run — A ceiling on the rows this run may return, counted over every hotel in the list. The per-hotel limit above says nothing about how many hotels you pasted, so this is the safety net: forty hotels at 10,000 reviews each is 400,000 rows. Leave empty for no ceiling."
+    },
+    "reviewsSort": {
+     "type": "string",
+     "description": "Sort reviews by — Order in which reviews are scraped",
+     "enum": [
+      "recent",
+      "ratingDesc",
+      "ratingAsc",
+      "helpful"
+     ],
+     "default": "recent"
+    },
+    "minRating": {
+     "type": "number",
+     "description": "⭐ Minimum rating — Keep only reviews rated at least this, on Agoda's 1–10 scale. Leave empty for all reviews."
+    },
+    "cutoffDate": {
+     "type": "string",
+     "description": "📅 Only reviews since — Skip reviews written before this date, format YYYY-MM-DD. With the default \"Most recent\" sort the Actor stops paging once it reaches older reviews, so incremental daily runs cost only the new reviews."
+    },
+    "onlyNewRowsStore": {
+     "type": "string",
+     "description": "🔁 Only new rows — memory name — Give this run a name — my-reviews-watch — and the Actor remembers every review row it delivered under that name. Every later run with the same name writes and charges only rows you have not received before. Schedule the Actor daily to get a feed of new reviews instea"
+    },
+    "proxyConfiguration": {
+     "type": "object",
+     "description": "Proxy configuration — Proxy settings. Recommended for larger runs.",
+     "default": {
+      "useApifyProxy": true
+     },
+     "additionalProperties": true
+    },
+    "includeRunSummary": {
+     "type": "boolean",
+     "description": "🧾 Add a free summary row at the end of the run — One extra free row at the end with the run's totals: rows delivered, free rows, what was charged and how much in US dollars. It carries type \"notice\", so a filter on the data rows skips it. Switch off if your pipeline cannot tolerate an extra row.",
+     "default": true
+    }
+   },
+   "required": []
+  }
+ },
+ {
+  "name": "threads-scraper",
+  "actor": "lergassy~threads-scraper",
+  "description": "Threads Scraper — $2/1K posts, profiles & search, no login. Threads scraper and Threads API alternative: scrape Meta Threads posts, replies, reposts, profiles, and keyword or hashtag search without a login. Threads data arrives as flat rows with engagement, media and links. Export it, run via API, schedule runs, or call it from an AI agent.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "mode": {
+     "type": "string",
+     "description": "🧭 What to get — Posts — an account's own posts, as many as you ask for. Replies / Reposts — what an account answered or boosted. Profile — followers, bio, links and contacts. Search — public posts for keywords and hashtags. Thread — one post with its replies. Accounts — people and brands matching a",
+     "enum": [
+      "posts",
+      "replies",
+      "reposts",
+      "profile",
+      "search",
+      "thread",
+      "users"
+     ],
+     "default": "posts"
+    },
+    "usernames": {
+     "type": "array",
+     "description": "👤 Usernames — For Posts, Replies, Reposts and Profile. Bare name, with @, or the profile URL: zuck, @natgeo, https://www.threads.net/@nasa.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "keywords": {
+     "type": "array",
+     "description": "🔎 Keywords or hashtags — For Search and Accounts. AI agents, #nba, coffee roaster brooklyn. The # is optional.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "postUrls": {
+     "type": "array",
+     "description": "🔗 Post URLs — For Thread mode: https://www.threads.net/@zuck/post/Dcy_A8pGo-m. Share links from the app (https://www.threads.com/share/CODE) work too. In Posts mode these are fetched too.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "startUrls": {
+     "type": "array",
+     "description": "🔗 Any Threads URLs — Profile, post, search or tag URLs — each is routed to the matching job automatically.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "maxPosts": {
+     "type": "integer",
+     "description": "💯 Posts per account or keyword — Cap per username or keyword, not per run. Posts mode pages through the whole profile; Search returns what Threads shows a logged-out visitor (usually 20–60 posts per keyword across the top, recent and tag pages).",
+     "default": 100
+    },
+    "maxRepliesPerPost": {
+     "type": "integer",
+     "description": "💬 Replies per post (Thread mode) — Threads shows a logged-out visitor the first ~25 replies of a post.",
+     "default": 100
+    },
+    "searchTypes": {
+     "type": "array",
+     "description": "🔎 Search result pages — Search mode: which result pages to combine. Duplicates are removed.",
+     "default": [
+      "top",
+      "recent",
+      "tags"
+     ],
+     "items": {
+      "type": "string",
+      "enum": [
+       "top",
+       "recent",
+       "tags"
+      ],
+      "enumTitles": [
+       "Top",
+       "Recent",
+       "Tag page (#hashtag)"
+      ]
+     }
+    },
+    "expandQueries": {
+     "type": "boolean",
+     "description": "🔁 Expand each keyword — Threads shows a visitor one page (20–25 posts) per query and result type, and different wordings return different posts. On, every keyword is also searched as singular/plural, with and without the hash and as a joined hashtag, in top, recent and tag order — several times mor",
+     "default": true
+    },
+    "postedAfter": {
+     "type": "string",
+     "description": "📅 Only posts after — YYYY-MM-DD. Older posts are dropped and Posts mode stops paging once it reaches them."
+    },
+    "postedBefore": {
+     "type": "string",
+     "description": "📅 Posted before — YYYY-MM-DD. Newer posts are dropped. Together with Posted after this gives a date window, so a scheduled run never re-collects yesterday's posts."
+    },
+    "filterKeywords": {
+     "type": "array",
+     "description": "🧹 Keep only posts containing — Case-insensitive words or phrases; a post is kept when it contains any of them. Empty = keep everything.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "strictKeywordMatch": {
+     "type": "boolean",
+     "description": "🎯 Only posts that contain the keyword — Search mode: keep a post only when your keyword (or every word of it) actually appears in the text or hashtags. Threads pads keyword results with loosely related posts — this switch removes them. Every row also carries containsKeyword so you can filter later ",
+     "default": false
+    },
+    "languages": {
+     "type": "array",
+     "description": "🌐 Languages — Keep only posts in these languages, ISO codes: en, es, ja, zh, ko, ru… Threads labels only some posts; for the rest the script of the text is used (Latin letters count as en). Empty = all languages.",
+     "default": [],
+     "items": {
+      "type": "string"
+     }
+    },
+    "minLikes": {
+     "type": "integer",
+     "description": "❤️ Minimum likes — Drop posts with fewer likes. 1 removes the zero-engagement filler that keyword search returns.",
+     "default": 0
+    },
+    "minReplies": {
+     "type": "integer",
+     "description": "💬 Minimum replies — Drop posts with fewer replies.",
+     "default": 0
+    },
+    "minViews": {
+     "type": "integer",
+     "description": "👁️ Minimum views — Keep only posts with at least this many views. Threads publishes a view count for very few posts when read without a login, so posts with no count are kept, not dropped. For a dependable threshold use Min likes or Min replies.",
+     "default": 0
+    },
+    "includeProfile": {
+     "type": "boolean",
+     "description": "👤 Add a profile row per account — Posts, Replies and Reposts modes: also save the account's profile (followers, bio, links, contacts).",
+     "default": false
+    },
+    "includeViews": {
+     "type": "boolean",
+     "description": "👁️ View counts — Fill viewCount on every post (the number Threads shows under a post, e.g. \"134K views\"). Read from each post's own page: one extra request per post, no extra charge. Turn off for the fastest possible bulk runs.",
+     "default": true
+    },
+    "includeProfileDetails": {
+     "type": "boolean",
+     "description": "👤 Full profiles in Accounts mode — Accounts mode: open each account's page for follower count, bio links and contacts (one extra request per account). It also sets the price of the row: with details on you pay the profile rate, with it off you pay the cheaper account rate — the row still arrives as",
+     "default": true
+    },
+    "maxUsersPerKeyword": {
+     "type": "integer",
+     "description": "👥 Accounts per keyword — Accounts mode.",
+     "default": 20
+    },
+    "maxItems": {
+     "type": "integer",
+     "description": "Maximum rows per run — Stop after this many rows in the run.",
+     "default": 10000
+    },
+    "monitoringStoreName": {
+     "type": "string",
+     "description": "🔔 Monitoring mode — store name — Give the run a name (e.g. brand-watch) and every later run with the same name returns only posts it has not delivered before. Schedule it hourly or daily to get a clean feed of new posts with nothing repeated and nothing billed twice. Empty = normal run."
+    },
+    "concurrency": {
+     "type": "integer",
+     "description": "Parallel jobs — How many accounts or keywords are processed at once.",
+     "default": 4
+    },
+    "proxyConfiguration": {
+     "type": "object",
+     "description": "Proxy configuration — Apify datacenter proxies work for Threads. If runs end with rate-limit error rows, switch to Residential.",
+     "default": {
+      "useApifyProxy": true
+     },
+     "additionalProperties": true
+    },
+    "includeRunSummary": {
+     "type": "boolean",
+     "description": "🧾 Add a free summary row at the end of the run — One extra free row with the run's totals: rows delivered, free rows, what was charged and how much in US dollars. It carries type \"notice\", so a filter on your data rows skips it.",
+     "default": true
+    }
+   },
+   "required": []
+  }
+ },
+ {
+  "name": "threads-search-scraper",
+  "actor": "lergassy~threads-search-scraper",
+  "description": "Threads Search Scraper — Keywords, Hashtags, Accounts. Search Meta Threads by keyword or hashtag and get every public post as a row: text, author, time, likes, replies, reposts, images, videos, links and mentions. Top, recent and tag pages in one pass, deduplicated. Finds matching accounts too. No login, no browser.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "mode": {
+     "type": "string",
+     "description": "🧭 What to get — Posts — an account's own posts, as many as you ask for. Replies / Reposts — what an account answered or boosted. Profile — followers, bio, links and contacts. Search — public posts for keywords and hashtags. Thread — one post with its replies. Accounts — people and brands matching a",
+     "enum": [
+      "search",
+      "users"
+     ],
+     "default": "search"
+    },
+    "keywords": {
+     "type": "array",
+     "description": "🔎 Keywords or hashtags — For Search and Accounts. AI agents, #nba, coffee roaster brooklyn. The # is optional.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "startUrls": {
+     "type": "array",
+     "description": "🔗 Threads search or tag URLs — Search result URLs (threads.com/search?q=…) and tag URLs (threads.com/tag/…) — the query is taken from the link. A plain word or phrase typed here is searched as a keyword. Profile and post links are not read by this Actor: use Threads Scraper for an account and Threa",
+     "items": {
+      "type": "string"
+     }
+    },
+    "maxPosts": {
+     "type": "integer",
+     "description": "💯 Posts per account or keyword — Cap per username or keyword, not per run. Posts mode pages through the whole profile; Search returns what Threads shows a logged-out visitor (usually 20–60 posts per keyword across the top, recent and tag pages).",
+     "default": 100
+    },
+    "searchTypes": {
+     "type": "array",
+     "description": "🔎 Search result pages — Search mode: which result pages to combine. Duplicates are removed.",
+     "default": [
+      "top",
+      "recent",
+      "tags"
+     ],
+     "items": {
+      "type": "string",
+      "enum": [
+       "top",
+       "recent",
+       "tags"
+      ],
+      "enumTitles": [
+       "Top",
+       "Recent",
+       "Tag page (#hashtag)"
+      ]
+     }
+    },
+    "strictKeywordMatch": {
+     "type": "boolean",
+     "description": "🎯 Only posts that contain the keyword — Search mode: keep a post only when your keyword (or every word of it) actually appears in the text or hashtags. Threads pads keyword results with loosely related posts — this switch removes them. Every row also carries containsKeyword so you can filter later ",
+     "default": false
+    },
+    "expandQueries": {
+     "type": "boolean",
+     "description": "🔁 Expand each keyword — Threads shows a visitor one page (20–25 posts) per query and result type, and different wordings return different posts. On, every keyword is also searched as singular/plural, with and without the hash and as a joined hashtag, in top, recent and tag order — several times mor",
+     "default": true
+    },
+    "postedAfter": {
+     "type": "string",
+     "description": "📅 Only posts after — YYYY-MM-DD. Older posts are dropped and Posts mode stops paging once it reaches them."
+    },
+    "filterKeywords": {
+     "type": "array",
+     "description": "🧹 Keep only posts containing — Case-insensitive words or phrases; a post is kept when it contains any of them. Empty = keep everything.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "includeProfile": {
+     "type": "boolean",
+     "description": "👤 Add a profile row per account — Posts, Replies and Reposts modes: also save the account's profile (followers, bio, links, contacts).",
+     "default": false
+    },
+    "maxUsersPerKeyword": {
+     "type": "integer",
+     "description": "👥 Accounts per keyword — Accounts mode.",
+     "default": 20
+    },
+    "includeViews": {
+     "type": "boolean",
+     "description": "👁️ View counts — Fill viewCount on every post (the number Threads shows under a post, e.g. \"134K views\"). Read from each post's own page: one extra request per post, no extra charge. Turn off for the fastest possible bulk runs.",
+     "default": true
+    },
+    "maxItems": {
+     "type": "integer",
+     "description": "Maximum rows per run — Stop after this many rows in the run.",
+     "default": 10000
+    },
+    "concurrency": {
+     "type": "integer",
+     "description": "Parallel jobs — How many accounts or keywords are processed at once.",
+     "default": 4
+    },
+    "proxyConfiguration": {
+     "type": "object",
+     "description": "Proxy configuration — Apify datacenter proxies work for Threads. If runs end with rate-limit error rows, switch to Residential.",
+     "default": {
+      "useApifyProxy": true
+     },
+     "additionalProperties": true
+    }
+   },
+   "required": []
+  }
+ },
+ {
+  "name": "threads-replies-scraper",
+  "actor": "lergassy~threads-replies-scraper",
+  "description": "Threads Replies Scraper — Conversations & Comments. The replies side of Threads as rows: every reply an account wrote with the post it answered, every reply under a post URL, and reposts. Text, author, time, engagement, media, links and reply context on each row. No login, no browser.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "mode": {
+     "type": "string",
+     "description": "🧭 What to get — Posts — an account's own posts, as many as you ask for. Replies / Reposts — what an account answered or boosted. Profile — followers, bio, links and contacts. Search — public posts for keywords and hashtags. Thread — one post with its replies. Accounts — people and brands matching a",
+     "enum": [
+      "replies",
+      "reposts",
+      "thread"
+     ],
+     "default": "replies"
+    },
+    "usernames": {
+     "type": "array",
+     "description": "👤 Usernames — For Posts, Replies, Reposts and Profile. Bare name, with @, or the profile URL: zuck, @natgeo, https://www.threads.net/@nasa.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "postUrls": {
+     "type": "array",
+     "description": "🔗 Post URLs — For Thread mode: https://www.threads.net/@zuck/post/Dcy_A8pGo-m. Share links from the app (https://www.threads.com/share/CODE) work too. In Posts mode these are fetched too.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "startUrls": {
+     "type": "array",
+     "description": "🔗 Threads post or profile URLs — Post URLs (threads.com/@user/post/…) for mode \"thread\", and profile URLs (threads.com/@username) for modes \"replies\" and \"reposts\". Search and tag links are not read by this Actor: use Threads Search Scraper for keywords.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "maxPosts": {
+     "type": "integer",
+     "description": "💯 Posts per account or keyword — Cap per username or keyword, not per run. Posts mode pages through the whole profile; Search returns what Threads shows a logged-out visitor (usually 20–60 posts per keyword across the top, recent and tag pages).",
+     "default": 100
+    },
+    "maxRepliesPerPost": {
+     "type": "integer",
+     "description": "💬 Replies per post (Thread mode) — Threads shows a logged-out visitor the first ~25 replies of a post.",
+     "default": 100
+    },
+    "postedAfter": {
+     "type": "string",
+     "description": "📅 Only posts after — YYYY-MM-DD. Older posts are dropped and Posts mode stops paging once it reaches them."
+    },
+    "filterKeywords": {
+     "type": "array",
+     "description": "🧹 Keep only posts containing — Case-insensitive words or phrases; a post is kept when it contains any of them. Empty = keep everything.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "includeProfile": {
+     "type": "boolean",
+     "description": "👤 Add a profile row per account — Posts, Replies and Reposts modes: also save the account's profile (followers, bio, links, contacts).",
+     "default": false
+    },
+    "includeProfileDetails": {
+     "type": "boolean",
+     "description": "👤 Full profiles in Accounts mode — Accounts mode: open each account's page for follower count, bio links and contacts (one extra request per account).",
+     "default": true
+    },
+    "includeViews": {
+     "type": "boolean",
+     "description": "👁️ View counts — Fill viewCount on every post (the number Threads shows under a post, e.g. \"134K views\"). Read from each post's own page: one extra request per post, no extra charge. Turn off for the fastest possible bulk runs.",
+     "default": true
+    },
+    "maxItems": {
+     "type": "integer",
+     "description": "Maximum rows per run — Stop after this many rows in the run.",
+     "default": 10000
+    },
+    "concurrency": {
+     "type": "integer",
+     "description": "Parallel jobs — How many accounts or keywords are processed at once.",
+     "default": 4
+    },
+    "proxyConfiguration": {
+     "type": "object",
+     "description": "Proxy configuration — Apify datacenter proxies work for Threads. If runs end with rate-limit error rows, switch to Residential.",
+     "default": {
+      "useApifyProxy": true
+     },
+     "additionalProperties": true
+    }
+   },
+   "required": []
+  }
+ },
+ {
+  "name": "linkedin-profile-scraper",
+  "actor": "lergassy~linkedin-profile-scraper",
+  "description": "LinkedIn Profile Scraper — No Cookies. [$3/1K profiles] LinkedIn profiles without login or cookies: name, headline, current title and company, location, about, followers, connections, full experience with dates, education, website, latest posts. Missing and private profiles are free. No account at risk.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "profileUrls": {
+     "type": "array",
+     "description": "👤 Profiles — LinkedIn profile URLs or slugs, one per line — https://www.linkedin.com/in/satyanadella or satyanadella. One row and one charge per profile; profiles that do not exist or are private are free. Sales Navigator / Recruiter links (linkedin.com/sales/lead/…) open only with a login — paste ",
+     "items": {
+      "type": "string"
+     }
+    },
+    "startUrls": {
+     "type": "array",
+     "description": "🔗 Profiles from a file or sheet — The same thing for long lists — upload a file or link a Google Sheet of profile URLs.",
+     "default": [],
+     "items": {
+      "type": "string"
+     }
+    },
+    "includePosts": {
+     "type": "boolean",
+     "description": "📰 Add the latest posts and articles — The person's recent posts (usually 5–9) and articles (up to 10) inside the same row. No extra charge.",
+     "default": false
+    },
+    "maxItems": {
+     "type": "integer",
+     "description": "Maximum profiles per run — A hard ceiling on what one run reads and bills.",
+     "default": 10000
+    },
+    "concurrency": {
+     "type": "integer",
+     "description": "Parallel pages — How many LinkedIn pages to read at the same time. Keep it low — LinkedIn dislikes bursts.",
+     "default": 3
+    },
+    "proxyConfiguration": {
+     "type": "object",
+     "description": "Proxy configuration — Residential, a new address for every profile — included in the price, nothing to set up. LinkedIn blocks direct and datacenter requests after a few dozen profiles, so those settings are ignored. Only your own proxy URLs replace it.",
+     "default": {
+      "useApifyProxy": true,
+      "apifyProxyGroups": [
+       "RESIDENTIAL"
+      ]
+     },
+     "additionalProperties": true
+    }
+   },
+   "required": []
+  }
+ },
+ {
+  "name": "linkedin-profile-details-scraper",
+  "actor": "blueskyscraper~linkedin-profile-details-scraper",
+  "description": "LinkedIn Profile Details Scraper. Scrape LinkedIn profile details in bulk from profile URLs, no login or cookies: headline, current title and company, location, about, followers, experience with dates, education, skills, certifications and languages. One row per profile; hidden profiles are free error rows.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "profileUrls": {
+     "type": "array",
+     "description": "👤 LinkedIn profiles — Profile URLs or slugs, one per line — https://www.linkedin.com/in/satyanadella or just satyanadella. Profiles that do not exist or that LinkedIn hides from logged-out visitors come back as free error rows.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "startUrls": {
+     "type": "array",
+     "description": "📄 URLs from a file or sheet — For long lists: upload a file or link a Google Sheet (or any text / CSV URL) that contains LinkedIn URLs. Each link is routed by its kind.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "findEmail": {
+     "type": "boolean",
+     "description": "📧 Find the work e-mail ($0.008 instead of $0.0032) — Find each person's work e-mail — the company's website, the address layout it uses, a mail-server (MX) check and a confidence level. A row WITH an e-mail is billed as Profile with e-mail; a row without one stays a plain Profile.",
+     "default": false
+    },
+    "minConfidence": {
+     "type": "string",
+     "description": "Minimum e-mail confidence — Used only when the SMTP mailbox check is unavailable in a run — normally every address is mailbox-checked and only a verified one goes into email. An address below this level is not put into email (it goes to emailGuess and alternatives) and the row is billed as a plain p",
+     "enum": [
+      "low",
+      "medium",
+      "high",
+      "confirmed"
+     ],
+     "default": "medium"
+    },
+    "companyOverride": {
+     "type": "string",
+     "description": "🏢 Company override — Use this company name or domain for everyone instead of what the profiles say — e.g. hubspot.com when the whole list works at one company."
+    },
+    "candidatesPerPerson": {
+     "type": "integer",
+     "description": "Alternative addresses per person — The best address goes into email, the runners-up into alternatives.",
+     "default": 3
+    },
+    "maxPagesPerCompany": {
+     "type": "integer",
+     "description": "Company web pages to read — Home page plus contact / team / about pages, read to learn how the company writes its addresses.",
+     "default": 4
+    },
+    "pageTimeoutSecs": {
+     "type": "integer",
+     "description": "Company web page timeout (seconds) — How long to wait for one company web page.",
+     "default": 15
+    },
+    "includePosts": {
+     "type": "boolean",
+     "description": "📰 Add the person's latest posts (free) — The person's recent posts and articles that LinkedIn shows logged-out visitors, inside the same row. No extra charge.",
+     "default": false
+    },
+    "maxItems": {
+     "type": "integer",
+     "description": "💯 Maximum profiles per run — A hard ceiling on the rows one run bills — profiles, companies or posts.",
+     "default": 10000
+    },
+    "concurrency": {
+     "type": "integer",
+     "description": "Parallel pages — How many LinkedIn pages to read at the same time. Keep it low — LinkedIn dislikes bursts.",
+     "default": 3
+    }
+   },
+   "required": []
+  }
+ },
+ {
+  "name": "linkedin-company-jobs-scraper",
+  "actor": "blueskyscraper~linkedin-company-jobs-scraper",
+  "description": "LinkedIn Company Jobs Scraper. Scrape all open LinkedIn jobs of any company without login: paste a company URL, ID or name and get every job with title, location, posting date, seniority, employment type, applicants, salary and full description. Track hiring at competitors, clients or prospects; schedule for new jobs only.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "companies": {
+     "type": "array",
+     "description": "🏢 Companies — All open jobs of these companies. Paste a LinkedIn company URL (https://www.linkedin.com/company/stripe), the numeric company ID (1441) or just the name (HubSpot). Keywords, if given, narrow each company's jobs.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "keywords": {
+     "type": "array",
+     "description": "🔍 Job titles or keywords — Optional: only jobs matching these words, e.g. engineer, sales. Empty = all of the company's jobs.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "locations": {
+     "type": "array",
+     "description": "📍 Locations — Optional: only jobs in these places, e.g. United States, London. Empty = everywhere.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "maxJobsPerQuery": {
+     "type": "integer",
+     "description": "💯 Jobs per company — Cap for each company (and each keyword × location inside it). LinkedIn lists at most about 1,000 jobs per search.",
+     "default": 100
+    },
+    "datePosted": {
+     "type": "string",
+     "description": "📅 Posted within — LinkedIn's own date filter.",
+     "enum": [
+      "any",
+      "hour",
+      "day",
+      "week",
+      "month"
+     ],
+     "default": "any"
+    },
+    "workplaceTypes": {
+     "type": "array",
+     "description": "🏠 Workplace — On-site, remote, hybrid — any combination. Empty = all.",
+     "items": {
+      "type": "string",
+      "enum": [
+       "onsite",
+       "remote",
+       "hybrid"
+      ],
+      "enumTitles": [
+       "On-site",
+       "Remote",
+       "Hybrid"
+      ]
+     }
+    },
+    "jobTypes": {
+     "type": "array",
+     "description": "⏱️ Job types — Empty = all job types.",
+     "items": {
+      "type": "string",
+      "enum": [
+       "fulltime",
+       "parttime",
+       "contract",
+       "temporary",
+       "internship",
+       "volunteer",
+       "other"
+      ],
+      "enumTitles": [
+       "Full-time",
+       "Part-time",
+       "Contract",
+       "Temporary",
+       "Internship",
+       "Volunteer",
+       "Other"
+      ]
+     }
+    },
+    "experience": {
+     "type": "array",
+     "description": "🎓 Experience level — Empty = all levels.",
+     "items": {
+      "type": "string",
+      "enum": [
+       "internship",
+       "entry",
+       "associate",
+       "mid",
+       "director",
+       "executive"
+      ],
+      "enumTitles": [
+       "Internship",
+       "Entry level",
+       "Associate",
+       "Mid-Senior level",
+       "Director",
+       "Executive"
+      ]
+     }
+    },
+    "radius": {
+     "type": "integer",
+     "description": "📏 Distance from location (miles) — LinkedIn's distance filter around a city: 5, 10, 25, 50 or 100. Empty = LinkedIn's default."
+    },
+    "easyApplyOnly": {
+     "type": "boolean",
+     "description": "⚡ Easy Apply jobs only — Only jobs you apply to on LinkedIn itself.",
+     "default": false
+    },
+    "under10ApplicantsOnly": {
+     "type": "boolean",
+     "description": "🌱 Fewer than 10 applicants — LinkedIn's \"Under 10 applicants\" filter: fresh jobs few people applied to.",
+     "default": false
+    },
+    "includeDescription": {
+     "type": "boolean",
+     "description": "📄 Open each job page — Full description, seniority, employment type, industries, applicants, job poster and apply type. Off = only what the search card shows (title, company, location, date, salary) — faster, same price.",
+     "default": true
+    },
+    "includeCompanyDetails": {
+     "type": "boolean",
+     "description": "🏢 Company details (free) — Read each hiring company's LinkedIn page once per run and add its website and domain, industry, size, employees on LinkedIn, followers, headquarters, founded year, type, specialties, description and tagline to every job row. Free — no extra charge.",
+     "default": true
+    },
+    "includeDescriptionHtml": {
+     "type": "boolean",
+     "description": "Description as HTML too — Add descriptionHtml with LinkedIn's formatting (lists, bold).",
+     "default": false
+    },
+    "onlyNewJobsStoreName": {
+     "type": "string",
+     "description": "🔔 Only new jobs — name this search — Give the search a name (e.g. nyc-data-jobs) and every later run with the same name returns only jobs it has not delivered before. Schedule it daily for a job alert. Empty = normal run."
+    },
+    "maxItems": {
+     "type": "integer",
+     "description": "Maximum jobs per run — Stop after this many jobs in the whole run — a hard ceiling on cost.",
+     "default": 20000
+    },
+    "proxyConfiguration": {
+     "type": "object",
+     "description": "Proxy — Leave as is: the Actor picks its own routes to LinkedIn. With your own proxy URLs, only those are used.",
+     "default": {
+      "useApifyProxy": true
+     },
+     "additionalProperties": true
+    }
+   },
+   "required": []
+  }
+ },
+ {
+  "name": "linkedin-profile-email-finder",
+  "actor": "blueskyscraper~linkedin-profile-email-finder",
+  "description": "LinkedIn Profile Email Finder. Find the verified work e-mail of LinkedIn profiles, no login or cookies: the company website, its address layout and an SMTP mailbox check, plus the full profile with title, company and experience. An e-mail is billed only when its mailbox is verified.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "profileUrls": {
+     "type": "array",
+     "description": "👤 LinkedIn profiles — Profile URLs or slugs, one per line — https://www.linkedin.com/in/satyanadella or just satyanadella. Profiles that do not exist or that LinkedIn hides from logged-out visitors come back as free error rows.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "startUrls": {
+     "type": "array",
+     "description": "📄 URLs from a file or sheet — For long lists: upload a file or link a Google Sheet (or any text / CSV URL) that contains LinkedIn URLs. Each link is routed by its kind.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "findEmail": {
+     "type": "boolean",
+     "description": "📧 Find the work e-mail ($0.008 instead of $0.0032) — Find each person's work e-mail — the company's website, the address layout it uses, a mail-server (MX) check and a confidence level. A row WITH an e-mail is billed as Profile with e-mail; a row without one stays a plain Profile.",
+     "default": true
+    },
+    "minConfidence": {
+     "type": "string",
+     "description": "Minimum e-mail confidence — Used only when the SMTP mailbox check is unavailable in a run — normally every address is mailbox-checked and only a verified one goes into email. An address below this level is not put into email (it goes to emailGuess and alternatives) and the row is billed as a plain p",
+     "enum": [
+      "low",
+      "medium",
+      "high",
+      "confirmed"
+     ],
+     "default": "medium"
+    },
+    "companyOverride": {
+     "type": "string",
+     "description": "🏢 Company override — Use this company name or domain for everyone instead of what the profiles say — e.g. hubspot.com when the whole list works at one company."
+    },
+    "candidatesPerPerson": {
+     "type": "integer",
+     "description": "Alternative addresses per person — The best address goes into email, the runners-up into alternatives.",
+     "default": 3
+    },
+    "maxPagesPerCompany": {
+     "type": "integer",
+     "description": "Company web pages to read — Home page plus contact / team / about pages, read to learn how the company writes its addresses.",
+     "default": 4
+    },
+    "pageTimeoutSecs": {
+     "type": "integer",
+     "description": "Company web page timeout (seconds) — How long to wait for one company web page.",
+     "default": 15
+    },
+    "includePosts": {
+     "type": "boolean",
+     "description": "📰 Add the person's latest posts (free) — The person's recent posts and articles that LinkedIn shows logged-out visitors, inside the same row. No extra charge.",
+     "default": false
+    },
+    "maxItems": {
+     "type": "integer",
+     "description": "💯 Maximum profiles per run — A hard ceiling on the rows one run bills — profiles, companies or posts.",
+     "default": 10000
+    },
+    "concurrency": {
+     "type": "integer",
+     "description": "Parallel pages — How many LinkedIn pages to read at the same time. Keep it low — LinkedIn dislikes bursts.",
+     "default": 3
+    }
+   },
+   "required": []
+  }
+ },
+ {
+  "name": "shopee-scraper",
+  "actor": "lergassy~shopee-scraper",
+  "description": "Shopee Scraper - Product Data, Prices & Discounts, 11 Markets. Shopee scraper and Shopee API alternative for product data from all 11 marketplaces: price, original price, discount, rating, shop name and rating, seller city, promo labels, plus product detail with description, brand and gallery. Indonesia, Vietnam, Thailand, Brazil and more. No browser or login.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "mode": {
+     "type": "string",
+     "description": "🧭 What to scrape — Choose the data type. Products from search – product cards from keyword search, category or listing URLs. Product details – full product pages with description, brand, gallery and seller. Shop – shop profile and its products. Auto decides by the URL you paste.",
+     "enum": [
+      "auto",
+      "search",
+      "product",
+      "shop"
+     ],
+     "default": "auto"
+    },
+    "country": {
+     "type": "string",
+     "description": "🌎 Country / marketplace — Shopee marketplace for keyword searches. URLs keep their own country.",
+     "enum": [
+      "ID",
+      "SG",
+      "MY",
+      "PH",
+      "TH",
+      "VN",
+      "BR",
+      "TW",
+      "MX",
+      "CO",
+      "CL"
+     ],
+     "default": "ID"
+    },
+    "searchTerms": {
+     "type": "array",
+     "description": "🔍 Search keywords — Products to search for, one per line, e.g. iphone 15. Each keyword is searched in the selected marketplace.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "startUrls": {
+     "type": "array",
+     "description": "🔗 Shopee URLs — Any Shopee links: product pages (.../Name-i.123.456), search results, category pages (...-cat.11044458) or shops (shopee.co.id/shopname).",
+     "items": {
+      "type": "string"
+     }
+    },
+    "maxItems": {
+     "type": "integer",
+     "description": "💯 Max products — Stop after this many products per keyword or URL.",
+     "default": 40
+    },
+    "enrichProducts": {
+     "type": "boolean",
+     "description": "Fetch full product details for every result ($) — Open each product page for description, brand, image gallery, category path and seller reputation. Slower and billed per product detail.",
+     "default": false
+    },
+    "includeShopAndReviews": {
+     "type": "boolean",
+     "description": "🏪 Shop name, shop rating and review count on every card — Search results: add the seller's shop name and rating, the product's review count, brand and price range to every card. Read from each product's page — one extra request per card, no extra charge. Turn off for the fastest possible runs.",
+     "default": true
+    },
+    "sortBy": {
+     "type": "string",
+     "description": "Sort results — Order of search results.",
+     "enum": [
+      "relevancy",
+      "sales",
+      "latest",
+      "price_asc",
+      "price_desc"
+     ],
+     "default": "relevancy"
+    },
+    "minPrice": {
+     "type": "integer",
+     "description": "Min price — Minimum price in the marketplace's own currency. Sent to Shopee and checked against the price on each card."
+    },
+    "maxPrice": {
+     "type": "integer",
+     "description": "Max price — Maximum price in the marketplace's own currency. Sent to Shopee and checked against the price on each card."
+    },
+    "minRating": {
+     "type": "number",
+     "description": "⭐ Minimum rating — Keep only products rated at least this (0–5 stars). Shopee's rating filter narrows the search first; the exact value is then checked on each card, and products without a rating are dropped. Dropped products are not charged."
+    },
+    "officialShopOnly": {
+     "type": "boolean",
+     "description": "🏬 Shopee Mall only — Only products from Shopee Mall (official brand stores). Shopee's own filter.",
+     "default": false
+    },
+    "preferredSellerOnly": {
+     "type": "boolean",
+     "description": "⭐ Preferred sellers only — Only products from Shopee Preferred and Preferred+ sellers (called Star and Star+ in Indonesia). Shopee's own filter.",
+     "default": false
+    },
+    "freeShippingOnly": {
+     "type": "boolean",
+     "description": "🚚 Free shipping only — Only products Shopee marks as free shipping. Shopee's own filter.",
+     "default": false
+    },
+    "codAvailableOnly": {
+     "type": "boolean",
+     "description": "💵 Cash on delivery only — Only products that can be paid on delivery (COD). Shopee's own filter.",
+     "default": false
+    },
+    "discountedOnly": {
+     "type": "boolean",
+     "description": "🏷️ Discounted only — Only products with a discount right now. Shopee's own filter, then checked on each card (the card must show an original price or a discount).",
+     "default": false
+    },
+    "withVideoOnly": {
+     "type": "boolean",
+     "description": "🎬 With product video only — Only products that have a product video. Shopee's own filter.",
+     "default": false
+    },
+    "condition": {
+     "type": "string",
+     "description": "Condition — New or used items. Shopee's own filter.",
+     "enum": [
+      "any",
+      "new",
+      "used"
+     ],
+     "default": "any"
+    },
+    "shippedFrom": {
+     "type": "string",
+     "description": "📍 Shipped from — A location from Shopee's \"Shipped From\" filter, as Shopee writes it: e.g. DKI Jakarta, Jawa Barat, Jabodetabek (Indonesia), Singapore or Mainland China (Singapore). If the name is not in Shopee's list for your search, that search is skipped with a free notice listing the valid name"
+    },
+    "brand": {
+     "type": "string",
+     "description": "Brand — A brand name, e.g. Spigen. When Shopee's brand filter lists it for your search, Shopee filters by it; otherwise only products with the brand in their title are kept (checked after download, dropped products not charged)."
+    },
+    "proxyConfiguration": {
+     "type": "object",
+     "description": "Proxy configuration — Shopee serves pages per region. Residential proxies in the marketplace country give the most stable results.",
+     "default": {
+      "useApifyProxy": true,
+      "apifyProxyGroups": [
+       "RESIDENTIAL"
+      ]
+     },
+     "additionalProperties": true
+    },
+    "maxConcurrency": {
+     "type": "integer",
+     "description": "Max concurrency — Parallel requests.",
+     "default": 3
+    }
+   },
+   "required": []
+  }
+ },
+ {
+  "name": "lazada-scraper",
+  "actor": "lergassy~lazada-scraper",
+  "description": "Lazada Scraper — Search, Product Data, Prices & Reviews. Scrape Lazada data from all six Southeast Asian marketplaces: search results, full product pages and reviews. Price, discount, rating, sold count, seller, image gallery and every variant with its own price and stock, plus reviews with photos and seller replies. No login, no API key, no start fee.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "mode": {
+     "type": "string",
+     "description": "🧭 What to scrape — What to scrape. **Auto** runs search for keywords and search/category/shop URLs, and product details for product URLs. 🔍 Search returns product cards; 📦 Product details and ⭐ Reviews need product URLs.",
+     "enum": [
+      "auto",
+      "search",
+      "product",
+      "reviews",
+      "product_reviews"
+     ],
+     "default": "auto"
+    },
+    "country": {
+     "type": "string",
+     "description": "🌎 Country / marketplace — Lazada marketplace for keyword searches. URLs keep their own country.",
+     "enum": [
+      "ID",
+      "MY",
+      "SG",
+      "PH",
+      "TH",
+      "VN"
+     ],
+     "default": "ID"
+    },
+    "searchTerms": {
+     "type": "array",
+     "description": "🔍 Search keywords — Keywords to search on the chosen marketplace, e.g. `wireless earbuds`. Each keyword returns product cards with price, discount, rating, sold count and seller, up to 🔢 Max products.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "startUrls": {
+     "type": "array",
+     "description": "🔗 Lazada URLs — Any Lazada links: product pages (.../products/...-i123456.html), search results, category, brand or shop pages. Bare item IDs also work. Product page URLs (`.../products/pdp-i.html`) are the reliable input right now.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "maxItems": {
+     "type": "integer",
+     "description": "💯 Max products — Stop after this many products per keyword or listing URL.",
+     "default": 40
+    },
+    "enrichProducts": {
+     "type": "boolean",
+     "description": "Fetch full product details for every result ($) — Open each product page for description, image gallery, variants, highlights and brand. Slower and billed per product detail.",
+     "default": false
+    },
+    "maxReviewsPerProduct": {
+     "type": "integer",
+     "description": "⭐ Max reviews per product — Reviews mode: how many reviews to collect for each product.",
+     "default": 100
+    },
+    "reviewsRating": {
+     "type": "string",
+     "description": "⭐ Only reviews with rating — Reviews mode: keep only reviews with this star rating.",
+     "enum": [
+      "all",
+      "5",
+      "4",
+      "3",
+      "2",
+      "1"
+     ],
+     "default": "all"
+    },
+    "sortBy": {
+     "type": "string",
+     "description": "Sort results — Order of search results.",
+     "enum": [
+      "relevance",
+      "price_asc",
+      "price_desc",
+      "newest",
+      "rating"
+     ],
+     "default": "relevance"
+    },
+    "minPrice": {
+     "type": "integer",
+     "description": "Min price — Minimum price in the marketplace's own currency."
+    },
+    "maxPrice": {
+     "type": "integer",
+     "description": "Max price — Maximum price in the marketplace's own currency."
+    },
+    "minRating": {
+     "type": "number",
+     "description": "⭐ Minimum rating — Keep only products rated at least this (0–5 stars). Applied to the rating shown on the card; products without a rating are dropped when this is set."
+    },
+    "proxyConfiguration": {
+     "type": "object",
+     "description": "Proxy configuration — Lazada answers most automated requests with an anti-bot page. The Actor rotates by itself — platform egress, datacenter, then residential — and keeps the address that got through. Leave as is unless you have your own proxy URLs.",
+     "default": {
+      "useApifyProxy": true,
+      "apifyProxyGroups": [
+       "RESIDENTIAL"
+      ]
+     },
+     "additionalProperties": true
+    }
+   },
+   "required": []
+  }
+ },
+ {
+  "name": "tokopedia-reviews-scraper",
+  "actor": "lergassy~tokopedia-reviews-scraper",
+  "description": "Tokopedia Scraper 💰$1.50/1K — Products, Reviews & Monitor. Scrape Tokopedia products with price, discount, units sold, seller tier, COD and offer labels, plus shop and product reviews with photos. Monitor mode returns only what changed since the last run — price moves, discounts starting, units sold, products gone. No API key.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "mode": {
+     "type": "string",
+     "description": "🛍️ What to get — Search — every matching product with price, discount, units sold, seller and labels. Monitor — run the same search on a schedule and get back only what changed since last time: price up or down, a discount that started or ended, units sold moving, a product gone from the results. U",
+     "enum": [
+      "search",
+      "monitor"
+     ],
+     "default": "search"
+    },
+    "monitorName": {
+     "type": "string",
+     "description": "🔖 Monitor name — Keeps separate memories for separate watches. Use one name per keyword set — \"iphone-jakarta\", \"competitor-shop\" — so two schedules never overwrite each other's history.",
+     "default": "default"
+    },
+    "searchTerms": {
+     "type": "array",
+     "description": "🔍 Search keywords — Find products by keyword, the way a shopper would: hair mask, iphone 15. Every match comes back as a product row, and with the toggle below, with its reviews too.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "maxProductsPerTerm": {
+     "type": "integer",
+     "description": "💯 Products per keyword — How many products to take from each keyword, best matches first.",
+     "default": 20
+    },
+    "includeProductReviews": {
+     "type": "boolean",
+     "description": "⭐ Reviews for each product found ($) — Collect the reviews of every product the search returns. Charged per review, like shop reviews.",
+     "default": false
+    },
+    "maxReviewsPerProduct": {
+     "type": "integer",
+     "description": "Max reviews per product — Upper limit per product when the toggle above is on.",
+     "default": 50
+    },
+    "startUrls": {
+     "type": "array",
+     "description": "🛍️ Tokopedia shop URLs — Tokopedia shop or product URLs, for example https://www.tokopedia.com/makarizo-advisor or a product page. Leave empty to search by keyword instead — the keyword path is faster and returns the full product card.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "maxReviewsPerShop": {
+     "type": "integer",
+     "description": "Max reviews per shop — Limit how many reviews are scraped per shop",
+     "default": 200
+    },
+    "reviewsSort": {
+     "type": "string",
+     "description": "Sort reviews by — Order in which reviews are scraped",
+     "enum": [
+      "recent",
+      "helpful",
+      "highest",
+      "lowest"
+     ],
+     "default": "recent"
+    },
+    "ratingFilter": {
+     "type": "string",
+     "description": "Filter by rating — Only scrape reviews with a given star rating, or only reviews that include photos/videos",
+     "enum": [
+      "all",
+      "5",
+      "4",
+      "3",
+      "2",
+      "1",
+      "with_media"
+     ],
+     "default": "all"
+    },
+    "proxyConfiguration": {
+     "type": "object",
+     "description": "Proxy configuration — Proxy settings. Recommended for larger runs.",
+     "default": {
+      "useApifyProxy": true
+     },
+     "additionalProperties": true
+    }
+   },
+   "required": []
+  }
+ },
+ {
+  "name": "mercadolibre-reviews-scraper",
+  "actor": "lergassy~mercadolibre-reviews-scraper",
+  "description": "Mercado Libre Scraper. Extract Mercado Libre and Mercado Livre data from all 18 Latin American marketplaces: products, prices, discounts, sellers, official stores, daily deals and buyer reviews with ratings and photos. Export data, run via API, schedule runs, or integrate with other tools or AI workflows.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "mode": {
+     "type": "string",
+     "description": "🧭 What to scrape — Choose the data type. Products (search) – product cards from keyword search or listing/category URLs. Product details – full product pages. Reviews – all reviews of the given products. Deals – today's deals from the Ofertas page. Official store – store profile and featured produc",
+     "enum": [
+      "auto",
+      "search",
+      "product",
+      "reviews",
+      "deals",
+      "store"
+     ],
+     "default": "auto"
+    },
+    "country": {
+     "type": "string",
+     "description": "🌎 Country / marketplace — Marketplace to search in. Used for search keywords and deals; URLs keep their own country.",
+     "enum": [
+      "MX",
+      "BR",
+      "AR",
+      "CL",
+      "CO",
+      "PE",
+      "UY",
+      "EC",
+      "VE",
+      "BO",
+      "PY",
+      "DO",
+      "CR",
+      "PA",
+      "GT",
+      "HN",
+      "SV",
+      "NI"
+     ],
+     "default": "MX"
+    },
+    "searchTerms": {
+     "type": "array",
+     "description": "🔍 Search keywords — Products to search for, one per line, e.g. iphone 15. Each keyword is searched in the selected country.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "startUrls": {
+     "type": "array",
+     "description": "🔗 Mercado Libre URLs — Any Mercado Libre links: search results, category pages, product pages (/p/MLM… or MLM-…), official stores (/tienda/…) or the deals page (/ofertas). Product IDs like MLM4700406170 also work.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "maxItems": {
+     "type": "integer",
+     "description": "💯 Max products — Stop after this many products per keyword or URL (search, deals, store modes).",
+     "default": 50
+    },
+    "maxReviewsPerProduct": {
+     "type": "integer",
+     "description": "⭐ Max reviews per product — Reviews mode: how many reviews to collect for each product. All reviews are public buyer reviews with text.",
+     "default": 100
+    },
+    "reviewsRating": {
+     "type": "string",
+     "description": "⭐ Only reviews with rating — Reviews mode: keep only reviews with this star rating.",
+     "enum": [
+      "all",
+      "5",
+      "4",
+      "3",
+      "2",
+      "1"
+     ],
+     "default": "all"
+    },
+    "reviewsSort": {
+     "type": "string",
+     "description": "⭐ Reviews order — Reviews mode: most relevant first (Mercado Libre default) or newest first.",
+     "enum": [
+      "relevance",
+      "date_desc"
+     ],
+     "default": "relevance"
+    },
+    "sort": {
+     "type": "string",
+     "description": "Sort results — Order of the results. Applied to the rows this run collected, so it orders your export rather than the whole Mercado Libre catalogue.",
+     "enum": [
+      "relevance",
+      "price_asc",
+      "price_desc"
+     ],
+     "default": "relevance"
+    },
+    "condition": {
+     "type": "string",
+     "description": "Condition — New, used or any. Applied to the collected rows, so the run walks extra pages to still reach your maximum.",
+     "enum": [
+      "any",
+      "new",
+      "used"
+     ],
+     "default": "any"
+    },
+    "minPrice": {
+     "type": "integer",
+     "description": "Min price — Minimum price in the marketplace's currency. Applied to the collected rows, so the run walks extra pages to still reach your maximum."
+    },
+    "maxPrice": {
+     "type": "integer",
+     "description": "Max price — Maximum price in the marketplace's currency. Applied to the collected rows, so the run walks extra pages to still reach your maximum."
+    },
+    "freeShippingOnly": {
+     "type": "boolean",
+     "description": "Free shipping only — Keep only listings with free shipping. Applied to the collected rows, so the run walks extra pages to still reach your maximum.",
+     "default": false
+    },
+    "officialStoresOnly": {
+     "type": "boolean",
+     "description": "Official stores only — Keep only listings sold by official brand stores. Applied to the collected rows, so the run walks extra pages to still reach your maximum.",
+     "default": false
+    },
+    "includeSponsored": {
+     "type": "boolean",
+     "description": "Include sponsored listings — Keep paid (sponsored) placements in search results.",
+     "default": true
+    },
+    "onlyNewRowsStore": {
+     "type": "string",
+     "description": "🔁 Only new rows — memory name — Give this run a name — my-products-watch — and the Actor remembers every product row it delivered under that name. Every later run with the same name writes and charges only rows you have not received before. Schedule the Actor daily to get a feed of new products ins"
+    },
+    "proxyConfiguration": {
+     "type": "object",
+     "description": "Proxy configuration — Search and product pages require residential proxies matched to the marketplace country (set automatically). Reviews, deals and store pages need no proxy.",
+     "default": {
+      "useApifyProxy": true,
+      "apifyProxyGroups": [
+       "RESIDENTIAL"
+      ]
+     },
+     "additionalProperties": true
+    },
+    "maxConcurrency": {
+     "type": "integer",
+     "description": "Max concurrency — Parallel pages for search and product modes. Three is the safe default for Mercado Libre; above five the site starts returning challenge pages instead of data.",
+     "default": 3
+    },
+    "debugDumpHtml": {
+     "type": "boolean",
+     "description": "Keep a rendered product page — Saves one rendered product page to the run's key-value store. For checking the parser against the live markup; leave off for normal runs.",
+     "default": false
+    }
+   },
+   "required": []
+  }
+ },
+ {
+  "name": "1688-scraper",
+  "actor": "blueskyscraper~1688-scraper",
+  "description": "1688 Scraper. Scrape 1688.com, China's wholesale market, without a login: keyword search in English or Chinese, full product pages with variants and specs, image search by photo, and factory and wholesaler lists. Prices in CNY and USD, English translations included. API ready.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "mode": {
+     "type": "string",
+     "description": "🧭 What to get — Products — 1688 search results: title (with English translation), price in CNY and USD, units sold, repeat-buyer rate, the factory or wholesaler with years, province and audit badges. Product details — the full product page: price range, minimum order, stock, variants with images, s",
+     "enum": [
+      "products",
+      "details",
+      "image",
+      "suppliers"
+     ],
+     "default": "products"
+    },
+    "keywords": {
+     "type": "array",
+     "description": "🔍 Search keywords — In English or Chinese: yoga mat, bluetooth earphones, 蓝牙耳机. English words are translated into the Chinese search words 1688 expects (the row shows both). Each keyword is one search.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "productUrls": {
+     "type": "array",
+     "description": "🔗 Product URLs or IDs — Product pages for Product details: https://detail.1688.com/offer/787646790056.html, the mobile link m.1688.com/offer/… or just the ID 787646790056.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "imageUrls": {
+     "type": "array",
+     "description": "🖼️ Image URLs — For Image search: links to product photos (.jpg, .png, .webp) — an Amazon, AliExpress, Shopify or your own picture (a public link — not localhost or 192.168.…). 1688 returns the factories selling the same or a similar item.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "startUrls": {
+     "type": "array",
+     "description": "🔗 1688 URLs — Any 1688 link, routed automatically: a search results page (s.1688.com/selloffer/offer_search.htm?keywords=…), a product page, a supplier shop (https://shopname.1688.com — its products, or one supplier row in Suppliers mode), or an image link.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "maxResultsPerInput": {
+     "type": "integer",
+     "description": "💯 Results per keyword, image or URL — Cap for each keyword, image or URL, not for the whole run. 1688 shows up to ~3,000 products per search (60 per page).",
+     "default": 60
+    },
+    "minPriceCny": {
+     "type": "number",
+     "description": "💴 Minimum price (CNY) — Products cheaper than this are skipped (free). 1 USD ≈ 7.1 CNY."
+    },
+    "maxPriceCny": {
+     "type": "number",
+     "description": "💴 Maximum price (CNY) — Products dearer than this are skipped (free)."
+    },
+    "manufacturersOnly": {
+     "type": "boolean",
+     "description": "🏭 Factories only — Keep only suppliers registered as manufacturers (生产加工) or with an on-site factory audit.",
+     "default": false
+    },
+    "provinces": {
+     "type": "array",
+     "description": "📍 Provinces or cities — Only suppliers from these places, in Chinese: 浙江 (Zhejiang), 广东 (Guangdong), 义乌 (Yiwu), 深圳 (Shenzhen). Empty = all.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "sortBy": {
+     "type": "string",
+     "description": "↕️ Order — 1688's best match, or best-selling first (sales in the last 30 days).",
+     "enum": [
+      "bestMatch",
+      "sales"
+     ],
+     "default": "bestMatch"
+    },
+    "excludeAds": {
+     "type": "boolean",
+     "description": "🚫 Skip sponsored listings — Leave out products placed by paid ads (marked isAd). Skipped rows are free.",
+     "default": false
+    },
+    "includeDetails": {
+     "type": "boolean",
+     "description": "📋 Open each product page ($0.003 per row) — Products and Image search: one full product-page row per result — variants with images, specifications, stock, weight, ship-from city, services — billed as a product page.",
+     "default": false
+    },
+    "includeVariants": {
+     "type": "boolean",
+     "description": "🧩 Variants, reviews, factory and description on product pages — Product pages also get every variant (SKU) with its own price and stock, the rating summary with review tags and the latest reviews, the factory profile — founded, staff, factory area, equipment, OEM/ODM, response rate, certifications ",
+     "default": true
+    },
+    "includeFactoryProfile": {
+     "type": "boolean",
+     "description": "🏭 Factory profile for each supplier — Suppliers mode: each supplier row also gets founded date, staff, factory area, equipment, OEM/ODM, new designs per year, response rate and certifications. Included in the supplier price.",
+     "default": true
+    },
+    "translateToEnglish": {
+     "type": "boolean",
+     "description": "🌐 Add English translations — Titles, specifications, variants, tags and company names get an English copy next to the Chinese original (titleEn, attributesEn…). Included in the price.",
+     "default": true
+    },
+    "maxItems": {
+     "type": "integer",
+     "description": "Maximum rows per run — Stop after this many rows in the whole run — a hard ceiling on cost.",
+     "default": 10000
+    },
+    "monitoringStoreName": {
+     "type": "string",
+     "description": "🔔 Monitoring mode — store name — Give the run a name (e.g. new-yoga-mats) and every later run with the same name returns only rows it has not delivered before — new products, new suppliers. Schedule it daily. Empty = normal run."
+    }
+   },
+   "required": []
+  }
+ },
+ {
+  "name": "1688-image-search-scraper",
+  "actor": "blueskyscraper~1688-image-search-scraper",
+  "description": "1688 Image Search Scraper. Find any product on 1688.com by photo: paste image links from Amazon, AliExpress, Shopify or your own pictures and get the matching factory listings with price in CNY and USD, units sold, repeat-buyer rate, English title and supplier details. Source products from China.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "mode": {
+     "type": "string",
+     "description": "🧭 What to get — Products — 1688 search results: title (with English translation), price in CNY and USD, units sold, repeat-buyer rate, the factory or wholesaler with years, province and audit badges. Product details — the full product page: price range, minimum order, stock, variants with images, s",
+     "enum": [
+      "image"
+     ],
+     "default": "image"
+    },
+    "imageUrls": {
+     "type": "array",
+     "description": "🖼️ Image URLs — For Image search: links to product photos (.jpg, .png, .webp) — an Amazon, AliExpress, Shopify or your own picture (a public link — not localhost or 192.168.…). 1688 returns the factories selling the same or a similar item.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "startUrls": {
+     "type": "array",
+     "description": "🔗 1688 URLs — Any 1688 link, routed automatically: a search results page (s.1688.com/selloffer/offer_search.htm?keywords=…), a product page, a supplier shop (https://shopname.1688.com — its products, or one supplier row in Suppliers mode), or an image link.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "maxResultsPerInput": {
+     "type": "integer",
+     "description": "💯 Results per keyword, image or URL — Cap for each keyword, image or URL, not for the whole run. 1688 shows up to ~3,000 products per search (60 per page).",
+     "default": 60
+    },
+    "minPriceCny": {
+     "type": "number",
+     "description": "💴 Minimum price (CNY) — Products cheaper than this are skipped (free). 1 USD ≈ 7.1 CNY."
+    },
+    "maxPriceCny": {
+     "type": "number",
+     "description": "💴 Maximum price (CNY) — Products dearer than this are skipped (free)."
+    },
+    "manufacturersOnly": {
+     "type": "boolean",
+     "description": "🏭 Factories only — Keep only suppliers registered as manufacturers (生产加工) or with an on-site factory audit.",
+     "default": false
+    },
+    "provinces": {
+     "type": "array",
+     "description": "📍 Provinces or cities — Only suppliers from these places, in Chinese: 浙江 (Zhejiang), 广东 (Guangdong), 义乌 (Yiwu), 深圳 (Shenzhen). Empty = all.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "sortBy": {
+     "type": "string",
+     "description": "↕️ Order — 1688's best match, or best-selling first (sales in the last 30 days).",
+     "enum": [
+      "bestMatch",
+      "sales"
+     ],
+     "default": "bestMatch"
+    },
+    "excludeAds": {
+     "type": "boolean",
+     "description": "🚫 Skip sponsored listings — Leave out products placed by paid ads (marked isAd). Skipped rows are free.",
+     "default": false
+    },
+    "includeDetails": {
+     "type": "boolean",
+     "description": "📋 Open each product page ($0.003 per row) — Products and Image search: one full product-page row per result — variants with images, specifications, stock, weight, ship-from city, services — billed as a product page.",
+     "default": false
+    },
+    "includeVariants": {
+     "type": "boolean",
+     "description": "🧩 Variants, reviews, factory and description on product pages — Product pages also get every variant (SKU) with its own price and stock, the rating summary with review tags and the latest reviews, the factory profile — founded, staff, factory area, equipment, OEM/ODM, response rate, certifications ",
+     "default": true
+    },
+    "translateToEnglish": {
+     "type": "boolean",
+     "description": "🌐 Add English translations — Titles, specifications, variants, tags and company names get an English copy next to the Chinese original (titleEn, attributesEn…). Included in the price.",
+     "default": true
+    },
+    "maxItems": {
+     "type": "integer",
+     "description": "Maximum rows per run — Stop after this many rows in the whole run — a hard ceiling on cost.",
+     "default": 10000
+    },
+    "monitoringStoreName": {
+     "type": "string",
+     "description": "🔔 Monitoring mode — store name — Give the run a name (e.g. new-yoga-mats) and every later run with the same name returns only rows it has not delivered before — new products, new suppliers. Schedule it daily. Empty = normal run."
+    }
+   },
+   "required": []
+  }
+ },
+ {
+  "name": "1688-product-details-scraper",
+  "actor": "blueskyscraper~1688-product-details-scraper",
+  "description": "1688 Product Details Scraper. Scrape full 1688.com product pages by URL or ID: price range in CNY and USD, minimum order, stock, units sold, variants with images, specifications, shipping weight, ship-from city, services and supplier badges — with English translations of every field.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "mode": {
+     "type": "string",
+     "description": "🧭 What to get — Products — 1688 search results: title (with English translation), price in CNY and USD, units sold, repeat-buyer rate, the factory or wholesaler with years, province and audit badges. Product details — the full product page: price range, minimum order, stock, variants with images, s",
+     "enum": [
+      "details"
+     ],
+     "default": "details"
+    },
+    "productUrls": {
+     "type": "array",
+     "description": "🔗 Product URLs or IDs — Product pages for Product details: https://detail.1688.com/offer/787646790056.html, the mobile link m.1688.com/offer/… or just the ID 787646790056.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "startUrls": {
+     "type": "array",
+     "description": "🔗 1688 URLs — Any 1688 link, routed automatically: a search results page (s.1688.com/selloffer/offer_search.htm?keywords=…), a product page, a supplier shop (https://shopname.1688.com — its products, or one supplier row in Suppliers mode), or an image link.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "maxResultsPerInput": {
+     "type": "integer",
+     "description": "💯 Results per keyword, image or URL — Each URL is one product page; this cap only matters for search URLs pasted in 1688 URLs.",
+     "default": 1
+    },
+    "includeVariants": {
+     "type": "boolean",
+     "description": "🧩 Variants, reviews, factory and description on product pages — Product pages also get every variant (SKU) with its own price and stock, the rating summary with review tags and the latest reviews, the factory profile — founded, staff, factory area, equipment, OEM/ODM, response rate, certifications ",
+     "default": true
+    },
+    "translateToEnglish": {
+     "type": "boolean",
+     "description": "🌐 Add English translations — Titles, specifications, variants, tags and company names get an English copy next to the Chinese original (titleEn, attributesEn…). Included in the price.",
+     "default": true
+    },
+    "maxItems": {
+     "type": "integer",
+     "description": "Maximum rows per run — Stop after this many rows in the whole run — a hard ceiling on cost.",
+     "default": 10000
+    },
+    "monitoringStoreName": {
+     "type": "string",
+     "description": "🔔 Monitoring mode — store name — Give the run a name (e.g. new-yoga-mats) and every later run with the same name returns only rows it has not delivered before — new products, new suppliers. Schedule it daily. Empty = normal run."
+    }
+   },
+   "required": []
+  }
+ },
+ {
+  "name": "tiktok-shop-top-products-scraper",
+  "actor": "lergassy~tiktok-shop-top-products-scraper",
+  "description": "TikTok Shop Top Products Scraper. Scrape TikTok Shop best-selling products with revenue (GMV), units sold, average price, growth, the video / live / shop-window split and affiliate commission in 15 markets. Search by keyword, category, shop or creator. Optional daily revenue analytics. JSON, CSV, API.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "keywords": {
+     "type": "array",
+     "description": "🔍 Keywords — Give this or another input below — or leave all empty for the overall top products of the chosen country. Products matching each keyword: air fryer, lip gloss, protein.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "categories": {
+     "type": "array",
+     "description": "🗂️ Categories — Optional. TikTok Shop category names — Beauty & Personal Care, Phones & Electronics, Skincare, Air Fryers. Each one is a separate list of top products; the matched category is in the row.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "creators": {
+     "type": "array",
+     "description": "👤 Creators — Optional. TikTok usernames (@name), profile links or creator IDs: the products of each creator.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "shopIds": {
+     "type": "array",
+     "description": "🏪 Shops — Optional. TikTok Shop shop IDs or store links (shop.tiktok.com/us/store/…/7495…): the products of each shop.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "country": {
+     "type": "string",
+     "description": "🌍 Country — TikTok Shop market. Revenue is in US dollars for every market.",
+     "enum": [
+      "US",
+      "GB",
+      "ID",
+      "TH",
+      "VN",
+      "PH",
+      "MY",
+      "SG",
+      "JP",
+      "MX",
+      "DE",
+      "IT",
+      "FR",
+      "ES",
+      "BR"
+     ],
+     "default": "US"
+    },
+    "period": {
+     "type": "string",
+     "description": "📅 Period — Sales window for revenue, units sold and growth.",
+     "enum": [
+      "last30Day",
+      "last7Day",
+      "lastDay"
+     ],
+     "default": "last30Day"
+    },
+    "month": {
+     "type": "string",
+     "description": "Calendar month — Optional, overrides Period: a past month as 2026-09."
+    },
+    "sortBy": {
+     "type": "string",
+     "description": "↕️ Sort by — Order of the list, highest first.",
+     "enum": [
+      "revenue",
+      "unitsSold",
+      "revenueGrowth",
+      "videoRevenue",
+      "shopWindowRevenue",
+      "commissionRate",
+      "price",
+      "newest"
+     ],
+     "default": "revenue"
+    },
+    "maxResultsPerSource": {
+     "type": "integer",
+     "description": "💯 Max products per input — Upper limit of products from each keyword, category, product, creator or shop (or from the overall top list). Duplicates across inputs are skipped and not charged. Free Apify plan: up to 20 from each of the first 2 inputs.",
+     "default": 100
+    },
+    "addAnalytics": {
+     "type": "boolean",
+     "description": "📈 Product analytics ($) — Paused until 22 October 2026 (rows come as plain rows at the plain price); from then $0.04 per row. Not on the free Apify plan. Adds to each product: number of creators, videos and lives selling it, review count, price range, shop ID, category IDs and delivery type. Each s",
+     "default": false
+    },
+    "minRevenue": {
+     "type": "integer",
+     "description": "Minimum revenue (USD) — Only rows with at least this revenue in the period. 0 = no floor.",
+     "default": 0
+    },
+    "maxRevenue": {
+     "type": "integer",
+     "description": "Maximum revenue (USD) — 0 = no ceiling.",
+     "default": 0
+    },
+    "minPrice": {
+     "type": "integer",
+     "description": "Minimum price (USD) — 0 = no floor.",
+     "default": 0
+    },
+    "maxPrice": {
+     "type": "integer",
+     "description": "Maximum price (USD) — 0 = no ceiling.",
+     "default": 0
+    },
+    "ascending": {
+     "type": "boolean",
+     "description": "Lowest first — Reverse the order: lowest values first.",
+     "default": false
+    }
+   },
+   "required": []
+  }
+ },
+ {
+  "name": "tiktok-shop-videos-scraper",
+  "actor": "lergassy~tiktok-shop-videos-scraper",
+  "description": "TikTok Shop Videos Scraper. Scrape TikTok Shop shoppable videos that sell: revenue (GMV), views, ad ROAS, likes, shares, comments, ad and AI-generated flags in 15 markets. Find them by keyword, category, product, creator or shop. Optional daily revenue, CPA and GPM. JSON, CSV, API.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "keywords": {
+     "type": "array",
+     "description": "🔍 Keywords — Give this or another input below — or leave all empty for the overall top videos of the chosen country. Videos matching each keyword: air fryer, lip gloss, protein.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "categories": {
+     "type": "array",
+     "description": "🗂️ Categories — Optional. TikTok Shop category names — Beauty & Personal Care, Phones & Electronics, Skincare, Air Fryers. Each one is a separate list of top videos; the matched category is in the row.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "productIds": {
+     "type": "array",
+     "description": "🛍️ Products — Optional. TikTok Shop product links or IDs (shop.tiktok.com/us/pdp/…/1729…): the videos selling each product.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "creators": {
+     "type": "array",
+     "description": "👤 Creators — Optional. TikTok usernames (@name), profile links or creator IDs: the videos of each creator.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "shopIds": {
+     "type": "array",
+     "description": "🏪 Shops — Optional. TikTok Shop shop IDs or store links (shop.tiktok.com/us/store/…/7495…): the videos of each shop.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "country": {
+     "type": "string",
+     "description": "🌍 Country — TikTok Shop market. Revenue is in US dollars for every market.",
+     "enum": [
+      "US",
+      "GB",
+      "ID",
+      "TH",
+      "VN",
+      "PH",
+      "MY",
+      "SG",
+      "JP",
+      "MX",
+      "DE",
+      "IT",
+      "FR",
+      "ES",
+      "BR"
+     ],
+     "default": "US"
+    },
+    "period": {
+     "type": "string",
+     "description": "📅 Period — Sales window for revenue, units sold and growth.",
+     "enum": [
+      "last30Day",
+      "last7Day",
+      "lastDay"
+     ],
+     "default": "last30Day"
+    },
+    "month": {
+     "type": "string",
+     "description": "Calendar month — Optional, overrides Period: a past month as 2026-09."
+    },
+    "sortBy": {
+     "type": "string",
+     "description": "↕️ Sort by — Order of the list, highest first.",
+     "enum": [
+      "revenue",
+      "views",
+      "revenueGrowth",
+      "adsRoas"
+     ],
+     "default": "revenue"
+    },
+    "maxResultsPerSource": {
+     "type": "integer",
+     "description": "💯 Max videos per input — Upper limit of videos from each keyword, category, product, creator or shop (or from the overall top list). Duplicates across inputs are skipped and not charged. Free Apify plan: up to 20 from each of the first 2 inputs.",
+     "default": 100
+    },
+    "addAnalytics": {
+     "type": "boolean",
+     "description": "📈 Video analytics ($) — Paused until 22 October 2026 (rows come as plain rows at the plain price); from then $0.04 per row. Not on the free Apify plan. Adds to each video: units sold, GPM, ad views, ad CPA, days advertised, duration, number of products. Each such row is charged as a video with anal",
+     "default": false
+    },
+    "minRevenue": {
+     "type": "integer",
+     "description": "Minimum revenue (USD) — Only rows with at least this revenue in the period. 0 = no floor.",
+     "default": 0
+    },
+    "maxRevenue": {
+     "type": "integer",
+     "description": "Maximum revenue (USD) — 0 = no ceiling.",
+     "default": 0
+    },
+    "minFollowers": {
+     "type": "integer",
+     "description": "Minimum creator followers — 0 = no floor.",
+     "default": 0
+    },
+    "maxFollowers": {
+     "type": "integer",
+     "description": "Maximum creator followers — 0 = no ceiling.",
+     "default": 0
+    },
+    "aiVideos": {
+     "type": "string",
+     "description": "AI-generated videos — Filter by TikTok's AI-generated video flag.",
+     "enum": [
+      "all",
+      "only",
+      "exclude"
+     ],
+     "default": "all"
+    },
+    "ascending": {
+     "type": "boolean",
+     "description": "Lowest first — Reverse the order: lowest values first.",
+     "default": false
+    }
+   },
+   "required": []
+  }
+ },
+ {
+  "name": "zillow-scraper",
+  "actor": "lergassy~zillow-scraper",
+  "description": "Zillow Scraper — Sold Homes, Rentals & Homes for Sale. Scrape Zillow sold homes with sold price and sold date, plus homes for sale and rentals — past the 820-result cap. One flat row per home: price, beds, baths, sqft, Zestimate, price history, agent phone, MLS. Sold comps by city, ZIP or map area.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "listingType": {
+     "type": "string",
+     "description": "🏠 Listing type — What to search for: homes for sale, for rent (houses, condos and apartment buildings) or recently sold homes with their sold date and price.",
+     "enum": [
+      "forSale",
+      "forRent",
+      "sold"
+     ]
+    },
+    "locations": {
+     "type": "array",
+     "description": "📍 Locations — One location per line, the way you would type it into Zillow: a city (Austin, TX), a ZIP code (78704), a neighborhood (Zilker, Austin, TX), a county (Travis County, TX) or a whole state (Nevada). Each location is searched separately and the rows say which one they came from.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "searchUrls": {
+     "type": "array",
+     "description": "🔗 Zillow search URLs — Zillow search pages copied from the browser, filters included (for example https://www.zillow.com/austin-tx/houses/?searchQueryState=…). Use this when the Zillow website already shows exactly the homes you want. Filters set below are added on top of what the URL carries.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "propertyUrls": {
+     "type": "array",
+     "description": "🏡 Property URLs, ZPIDs or addresses — Homes you already know: a Zillow property URL (https://www.zillow.com/homedetails/…_zpid/), an apartment-building URL, a bare ZPID (331627751) or a street address (15000 Upland Willow Rd, Austin, TX 78724). Each one returns a full property row with description,",
+     "items": {
+      "type": "string"
+     }
+    },
+    "includeDetails": {
+     "type": "boolean",
+     "description": "📄 Add full details to every search result — Open every home found by the search and add its full page: description, price history, all photos, facts and features (parking, heating, HOA, lot), listing agent and broker contact, MLS number, Zillow's own highlight phrases. Costs one extra request and o",
+     "default": false
+    },
+    "maxItems": {
+     "type": "integer",
+     "description": "🔢 Maximum results — Hard cap on rows for the whole run, across all locations and URLs. The run stops the moment it is reached, so this is also your cost cap: results × price per result. Set 0 for no limit.",
+     "default": 100
+    },
+    "bypassResultCap": {
+     "type": "boolean",
+     "description": "🗺️ Bypass Zillow's 820-result cap — Zillow shows at most 20 pages × 41 homes for one search. When a location has more, the scraper splits the map into smaller areas and searches each of them, so a whole city comes back complete. Turn off to stop at Zillow's first 820.",
+     "default": true
+    },
+    "sort": {
+     "type": "string",
+     "description": "↕️ Sort order — Order of the results, same options as Zillow's sort menu. Matters when Maximum results is smaller than the number of matching homes.",
+     "enum": [
+      "relevance",
+      "newest",
+      "priceLow",
+      "priceHigh",
+      "beds",
+      "baths",
+      "sqft",
+      "lot",
+      "yearBuilt",
+      "priceCut",
+      "daysOnZillow"
+     ],
+     "default": "relevance"
+    },
+    "priceMin": {
+     "type": "integer",
+     "description": "💵 Price from — Minimum price in US dollars. For rentals this is the monthly rent."
+    },
+    "priceMax": {
+     "type": "integer",
+     "description": "💵 Price up to — Maximum price in US dollars (monthly rent for rentals)."
+    },
+    "bedsMin": {
+     "type": "integer",
+     "description": "🛏️ Bedrooms from — Minimum number of bedrooms. 0 includes studios."
+    },
+    "bedsMax": {
+     "type": "integer",
+     "description": "🛏️ Bedrooms up to — Maximum number of bedrooms."
+    },
+    "bathsMin": {
+     "type": "number",
+     "description": "🛁 Bathrooms from — Minimum number of bathrooms, halves allowed (1.5)."
+    },
+    "homeTypes": {
+     "type": "array",
+     "description": "🏘️ Home types — Which kinds of home to include. Empty means all types.",
+     "default": [],
+     "items": {
+      "type": "string",
+      "enum": [
+       "house",
+       "condo",
+       "townhouse",
+       "multiFamily",
+       "apartment",
+       "lot",
+       "manufactured"
+      ],
+      "enumTitles": [
+       "Houses",
+       "Condos",
+       "Townhomes",
+       "Multi-family",
+       "Apartments",
+       "Lots / land",
+       "Manufactured"
+      ]
+     }
+    },
+    "sqftMin": {
+     "type": "integer",
+     "description": "📐 Square feet from — Minimum living area in square feet."
+    },
+    "sqftMax": {
+     "type": "integer",
+     "description": "📐 Square feet up to — Maximum living area in square feet."
+    },
+    "lotSizeMin": {
+     "type": "integer",
+     "description": "🌳 Lot size from (sqft) — Minimum lot size in square feet (an acre is 43,560)."
+    },
+    "lotSizeMax": {
+     "type": "integer",
+     "description": "🌳 Lot size up to (sqft) — Maximum lot size in square feet."
+    },
+    "yearBuiltMin": {
+     "type": "integer",
+     "description": "🏗️ Year built from — Earliest construction year to include."
+    },
+    "yearBuiltMax": {
+     "type": "integer",
+     "description": "🏗️ Year built up to — Latest construction year to include."
+    },
+    "daysOnZillow": {
+     "type": "string",
+     "description": "📅 Listed within — Only homes listed (or, for the sold type, sold) within this period.",
+     "enum": [
+      "any",
+      "1",
+      "7",
+      "14",
+      "30",
+      "90",
+      "6m",
+      "12m",
+      "24m",
+      "36m"
+     ],
+     "default": "any"
+    },
+    "sellerTypes": {
+     "type": "array",
+     "description": "🏷️ Seller and listing types (for sale) — Narrow for-sale results to who is selling. Empty means all of them. Owner posted is the FSBO filter investors look for; Foreclosures, Auctions and Pre-foreclosures are the distressed-property filters.",
+     "default": [],
+     "items": {
+      "type": "string",
+      "enum": [
+       "agentListed",
+       "ownerPosted",
+       "newConstruction",
+       "foreclosure",
+       "auction",
+       "preForeclosure",
+       "foreclosed",
+       "comingSoon"
+      ],
+      "enumTitles": [
+       "Agent listed",
+       "Owner posted (FSBO)",
+       "New construction",
+       "Foreclosures",
+       "Auctions",
+       "Pre-foreclosures",
+       "Foreclosed (bank owned)",
+       "Coming soon"
+      ]
+     }
+    },
+    "includePending": {
+     "type": "boolean",
+     "description": "⏳ Include pending and under-contract homes — For-sale searches: also return homes that are pending or under contract (accepting backup offers). Off returns active listings only.",
+     "default": false
+    },
+    "keywords": {
+     "type": "string",
+     "description": "🔍 Keywords — Words that must appear in the listing text, for example pool, ADU, fixer, mother-in-law. Same as the keyword box on Zillow."
+    },
+    "features": {
+     "type": "array",
+     "description": "✨ Must-have features — Home features the listing must have.",
+     "default": [],
+     "items": {
+      "type": "string",
+      "enum": [
+       "pool",
+       "airConditioning",
+       "garage",
+       "waterfront",
+       "singleStory",
+       "basement",
+       "view",
+       "3dTour",
+       "openHouse",
+       "priceCut",
+       "petsAllowed",
+       "furnished",
+       "inUnitLaundry"
+      ],
+      "enumTitles": [
+       "Pool",
+       "Air conditioning",
+       "Garage",
+       "Waterfront",
+       "Single story",
+       "Basement",
+       "View (city, mountain, park, water)",
+       "3D tour",
+       "Open house scheduled",
+       "Price cut",
+       "Pets allowed (rentals)",
+       "Furnished (rentals)",
+       "In-unit laundry (rentals)"
+      ]
+     }
+    },
+    "hoaMax": {
+     "type": "integer",
+     "description": "🏢 HOA fee up to (monthly) — Maximum monthly HOA fee in dollars. 0 means no HOA at all."
+    },
+    "parkingSpotsMin": {
+     "type": "integer",
+     "description": "🚗 Parking spots from — Minimum number of parking spots."
+    },
+    "oneRowPerUnit": {
+     "type": "boolean",
+     "description": "🏢 One row per rental unit — Rentals: apartment buildings list several units and floor plans. On, every unit becomes its own row (beds, baths, sqft, rent, availability). Off, a building is one row with its units nested in units.",
+     "default": false
+    },
+    "monitoringStoreName": {
+     "type": "string",
+     "description": "🔔 Monitoring mode — store name — Give this run a name (letters, digits and dashes, e.g. austin-fsbo-watch) and every later run with the same name returns only homes that are new or whose price or status changed since the previous run. Schedule it daily to get a change feed instead of the whole list"
+    },
+    "includeRawData": {
+     "type": "boolean",
+     "description": "🧾 Include raw Zillow data — Add a raw field with everything Zillow returned for the home, untouched. Useful for developers; makes rows large.",
+     "default": false
+    },
+    "maxConcurrency": {
+     "type": "integer",
+     "description": "⚡ Parallel requests — How many Zillow pages are fetched at the same time. Higher is faster; lower is gentler if you see blocked rows.",
+     "default": 5
+    },
+    "requestTimeoutSecs": {
+     "type": "integer",
+     "description": "⏱️ Request timeout (seconds) — How long to wait for one Zillow page.",
+     "default": 30
+    },
+    "proxyConfiguration": {
+     "type": "object",
+     "description": "🌐 Proxy — Leave off. Zillow shows its anti-bot page to some networks, and when that happens the Actor switches to an Apify US residential IP by itself, for the blocked requests only. Set your own proxy here only if you want to force a specific country or your own IPs.",
+     "default": {
+      "useApifyProxy": false
+     },
+     "additionalProperties": true
+    }
+   },
+   "required": [
+    "listingType"
+   ]
+  }
+ },
+ {
+  "name": "us-business-filings",
+  "actor": "lergassy~us-business-filings",
+  "description": "US New Business Leads 💰$4/1K — Newly Registered Companies. New business leads from official open data: newly registered companies from state registries, new business licences in major cities, and funded startups from SEC Form D filings. Every phone and email is checked before you get it, with a lead score on each row.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "preset": {
+     "type": "string",
+     "description": "🎯 Quick start — Pick a ready-made lead feed and click Start — the preset sets sources and filters for you. Choose Custom to use the fields below exactly as you set them.",
+     "enum": [
+      "custom",
+      "local_leads_with_phones",
+      "connecticut_email_leads",
+      "funded_startups"
+     ],
+     "default": "custom"
+    },
+    "states": {
+     "type": "array",
+     "description": "🗺️ States — State registries (new company formations). Supported: FL, NY, TX, CO, PA, OR, CT, DC (with beneficial owners), ID, WV (with every officer). Use ALL for every supported state, or leave empty to use cities only.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "cities": {
+     "type": "array",
+     "description": "🏙️ Cities — Municipal business-license feeds (newly opened businesses, often with owner name and phone). Supported: CHI Chicago, NYC New York City, LA Los Angeles, SF San Francisco, SEA Seattle, ORL Orlando, NFK Norfolk, NOLA New Orleans, BTR Baton Rouge. Use ALL for every city.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "signals": {
+     "type": "array",
+     "description": "💸 Funding signals — Add companies that are raising money, from official SEC EDGAR filings (free, no key). Form D: private rounds (seed, VC, private placements) — amount sold, investors, executive officers, phone. Form C: equity crowdfunding campaigns (Wefunder, StartEngine, Republic) — target, plat",
+     "items": {
+      "type": "string",
+      "enum": [
+       "EDGAR_FORM_D",
+       "EDGAR_FORM_C",
+       "EDGAR_FORM_1A"
+      ],
+      "enumTitles": [
+       "SEC Form D — private funding rounds",
+       "SEC Form C — equity crowdfunding campaigns",
+       "SEC Form 1-A — Regulation A+ offerings"
+      ]
+     }
+    },
+    "registeredSince": {
+     "type": "string",
+     "description": "Registered since (YYYY-MM-DD) — Only businesses registered or licensed on or after this date. Leave empty for the newest records. In monitor mode this is set automatically from the last run."
+    },
+    "maxResultsPerState": {
+     "type": "integer",
+     "description": "Max results per source — Limit records pulled per state or city The default keeps a first run to a couple of hundred rows across the prefilled states; raise it for a real harvest.",
+     "default": 30
+    },
+    "requireContact": {
+     "type": "boolean",
+     "description": "Only records with a phone or email — Drop businesses that come without a phone number or email address.",
+     "default": false
+    },
+    "enrichWebsite": {
+     "type": "boolean",
+     "description": "🌐 Find the company website and the contacts on it — Look up each company's own website from its registered name and prove it belongs to that company: the registry's ZIP or city must appear on the page, or the page's phone number must be in the state where the company registered. Proved matches go t",
+     "default": true
+    },
+    "maxWebsiteLookups": {
+     "type": "integer",
+     "description": "Companies to look up per run — Upper bound on website lookups in one run, so a large harvest cannot run long. Records with no e-mail are looked up first.",
+     "default": 300
+    },
+    "verifyContacts": {
+     "type": "boolean",
+     "description": "✅ Check phone numbers and e-mail domains ($) — Validate every phone number against the North American numbering plan and check whether each e-mail domain can receive mail (MX lookup), then add the result to each record. Adds a few seconds per run.",
+     "default": true
+    },
+    "contactQuality": {
+     "type": "string",
+     "description": "📇 Keep only leads with — Filter the feed by what the contact checks found. The stricter options need Check phone numbers and e-mail domains switched on.",
+     "enum": [
+      "any",
+      "contact",
+      "valid_contact",
+      "deliverable_email",
+      "deliverable_email_person"
+     ],
+     "default": "any"
+    },
+    "minLeadScore": {
+     "type": "integer",
+     "description": "Minimum lead score (0–100) — Every business gets a leadScore: fresh registration, phone, email, contact name, street address and a company entity type (LLC/Corp) add points. Set e.g. 50 to keep only records with real contact details.",
+     "default": 0
+    },
+    "industries": {
+     "type": "array",
+     "description": "Industries — Keep only businesses tagged with these industries, e.g. Real Estate, Construction, Healthcare, Food, Technology, Legal, Finance, Transportation, Beauty. Tags come from the registry's own category or NAICS where available, otherwise from the company name.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "newFormationsOnly": {
+     "type": "boolean",
+     "description": "New businesses only — Keep only records that create a business: new formations in New York (drops biennial statements, amendments, dissolutions) and newly issued licenses in Chicago (drops renewals).",
+     "default": true
+    },
+    "onlyNew": {
+     "type": "boolean",
+     "description": "Monitor mode — only new since last run — Remembers every record already delivered and returns only new ones next time. Schedule this Actor daily and get a clean feed of fresh businesses without duplicates.",
+     "default": false
+    },
+    "entityTypeContains": {
+     "type": "string",
+     "description": "Entity type — Filter by type keyword: LLC, CORP, LP, NONPROFIT"
+    },
+    "cityContains": {
+     "type": "string",
+     "description": "City contains — Only businesses whose city matches, e.g. Brooklyn"
+    },
+    "zipPrefix": {
+     "type": "string",
+     "description": "ZIP starts with — Only businesses whose ZIP starts with this, e.g. 112 for Brooklyn"
+    },
+    "nameContains": {
+     "type": "string",
+     "description": "Company name contains — Full-text search on company name"
+    },
+    "near": {
+     "type": "string",
+     "description": "📍 Near (latitude,longitude) — Only businesses within Radius of this point, e.g. 40.7128,-74.0060 for Manhattan. Uses the coordinates the portal publishes (Chicago, New York City, Los Angeles, San Francisco, Norfolk, New Orleans, Pennsylvania); records without coordinates are skipped."
+    },
+    "radiusMiles": {
+     "type": "integer",
+     "description": "Radius (miles) — Distance from the Near point",
+     "default": 25
+    },
+    "excludeNames": {
+     "type": "array",
+     "description": "Exclude companies — Company names to skip — paste your existing customers or blocklist. Matched ignoring case, punctuation and legal suffixes (LLC, Inc.).",
+     "items": {
+      "type": "string"
+     }
+    },
+    "mergeDuplicates": {
+     "type": "boolean",
+     "description": "Merge duplicates — One business per row: the same company appearing twice (two licenses, a registry record and a city license) is merged, contact details are combined and every source is listed in sources.",
+     "default": true
+    },
+    "includeFunds": {
+     "type": "boolean",
+     "description": "Include investment funds (EDGAR) — Also return Form D filings by pooled investment funds, venture-capital and private-equity vehicles and SPVs. Off by default: these are not operating businesses.",
+     "default": false
+    },
+    "monitorStoreName": {
+     "type": "string",
+     "description": "Monitor memory name — Name of the key-value store that remembers delivered records in monitor mode. Use different names to run several independent feeds (e.g. one per client). Lowercase letters, digits and hyphens; anything else (spaces, capitals) is converted automatically, e.g. \"My Feed\" → \"my-fee",
+     "default": "us-business-filings-monitor"
+    },
+    "appToken": {
+     "type": "string",
+     "description": "Socrata app token (optional) — Optional Socrata app token for higher rate limits"
+    },
+    "proxyConfiguration": {
+     "type": "object",
+     "description": "Proxy configuration — Optional. Not required — this Actor uses public open-data APIs.",
+     "default": {
+      "useApifyProxy": false
+     },
+     "additionalProperties": true
+    }
+   },
+   "required": []
+  }
+ },
+ {
+  "name": "youtube-comments-scraper",
+  "actor": "lergassy~youtube-comments-scraper",
+  "description": "YouTube Comments Scraper — $0.50/1K comments & replies. Scrape YouTube comments and replies from videos, whole channels, playlists or a YouTube search: text, likes, creator hearts, pinned flag, reply count, commenter channel and video stats. Sort newest or top, filter by keyword, likes and date. Export, run via API, schedule, or use with AI agents.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "videoUrls": {
+     "type": "array",
+     "description": "🎬 Video URLs or IDs — YouTube video links or 11-character video IDs, one per line: https://www.youtube.com/watch?v=dQw4w9WgXcQ, https://youtu.be/dQw4w9WgXcQ, a Shorts link, or just dQw4w9WgXcQ.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "channelUrls": {
+     "type": "array",
+     "description": "📺 Channel URLs — Channel links, one per line — https://www.youtube.com/@mkbhd or a /channel/UC… link. The channel's latest videos are collected (see Videos per channel) and their comments scraped.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "playlistUrls": {
+     "type": "array",
+     "description": "📋 Playlist URLs — Playlist links, one per line. Every video in the playlist is scraped, up to Videos per channel.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "searchQueries": {
+     "type": "array",
+     "description": "🔍 YouTube search — Search YouTube and scrape the comments of the top results — \"iphone 17 review\", \"n8n tutorial\". Up to Videos per channel videos per query.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "maxVideosPerSource": {
+     "type": "integer",
+     "description": "📹 Videos per channel / playlist / search — How many videos to take from each channel, playlist or search — newest first for channels, playlist order for playlists, YouTube's ranking for searches.",
+     "default": 10
+    },
+    "maxCommentsPerVideo": {
+     "type": "integer",
+     "description": "💬 Comments per video — Stop after this many comments per video (replies count too when included). 0 = all comments; a viral video can have hundreds of thousands.",
+     "default": 100
+    },
+    "sort": {
+     "type": "string",
+     "description": "↕️ Sort comments — Newest first plus a date cutoff turns a scheduled run into a feed of what was said since last time.",
+     "enum": [
+      "top",
+      "newest"
+     ],
+     "default": "top"
+    },
+    "includeReplies": {
+     "type": "boolean",
+     "description": "↩️ Include replies — Also collect the replies under each comment. Each reply is its own row with parentCommentId set.",
+     "default": true
+    },
+    "maxRepliesPerComment": {
+     "type": "integer",
+     "description": "Replies per comment — Cap on replies collected under one comment. 0 = all.",
+     "default": 20
+    },
+    "commentsSince": {
+     "type": "string",
+     "description": "📅 Only comments since — Skip comments older than this: a date such as 2026-06-01 or a period such as 7 days, 3 months. YouTube shows ages, not dates, so the cutoff is applied to that age. With Newest first collection stops at the first older comment."
+    },
+    "keyword": {
+     "type": "string",
+     "description": "🔎 Keyword in comment — Keep only comments whose text contains this word or phrase (case-insensitive). Several alternatives: separate with |, e.g. battery|charging."
+    },
+    "minLikes": {
+     "type": "integer",
+     "description": "👍 Minimum likes — Keep only comments with at least this many likes."
+    },
+    "onlyCreatorHearted": {
+     "type": "boolean",
+     "description": "❤️ Only comments hearted by the creator — Keep only comments the channel owner marked with a heart — the ones the creator noticed.",
+     "default": false
+    },
+    "includeVideoDetails": {
+     "type": "boolean",
+     "description": "🎥 Video summary rows — Add one row per video with title, channel, views, likes, publish date, duration and how many comments were collected (rowType = video). These rows have different columns from the comment rows, so the table shows blanks where a column does not apply.",
+     "default": false
+    },
+    "language": {
+     "type": "string",
+     "description": "🌐 Language — Two-letter language for YouTube's interface text, such as en, de, id. Affects comment ages (\"2 weeks ago\") and video metadata labels, not the comments themselves.",
+     "default": "en"
+    },
+    "proxyConfiguration": {
+     "type": "object",
+     "description": "Proxy — YouTube serves video pages from Apify's data-centre addresses but answers the comments continuation with 403, so a run moves itself onto a residential proxy the first time that happens. Bring your own proxies here to keep the run on them instead.",
+     "default": {
+      "useApifyProxy": false
+     },
+     "additionalProperties": true
+    }
+   },
+   "required": []
+  }
+ },
+ {
+  "name": "whisper-transcriber",
+  "actor": "lergassy~whisper-transcriber",
+  "description": "Whisper Transcriber — Video Links & Files to Text. Whisper large v3 transcription, no API key: paste a YouTube, TikTok, Vimeo or SoundCloud link, or an MP3, WAV, M4A, FLAC, OGG, MP4 or MOV file, and get clean text with timecodes in 90+ languages. Export data, run via API, schedule runs, or integrate with AI workflows.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "urls": {
+     "type": "array",
+     "description": "🎙️ Video links or media files — Paste a link from YouTube, TikTok, Instagram, Facebook, X, Vimeo, SoundCloud, Twitch, Dailymotion, VK, Rutube or Bilibili — the audio track is resolved for you — or a direct file: MP3, M4A, WAV, FLAC, OGG, MP4, MOV, WEBM and anything else ffmpeg can read. Video is st",
+     "items": {
+      "type": "string"
+     }
+    },
+    "file": {
+     "type": "string",
+     "description": "📎 Upload a file — Upload one audio or video file from your computer instead of giving a URL."
+    },
+    "quality": {
+     "type": "string",
+     "description": "🎚️ Recognition quality — Fast is the everyday choice. Accurate makes fewer mistakes on accents, noise and technical vocabulary; it is slower, and the price per minute is the same.",
+     "enum": [
+      "fast",
+      "accurate"
+     ],
+     "default": "accurate"
+    },
+    "language": {
+     "type": "string",
+     "description": "🔤 Spoken language — Two-letter code of the language spoken, for example en, ru, id. Leave empty to detect it automatically."
+    },
+    "translateToEnglish": {
+     "type": "boolean",
+     "description": "Translate to English — Return an English transcript no matter what language is spoken.",
+     "default": false
+    },
+    "diarize": {
+     "type": "boolean",
+     "description": "🗣️ Speaker labels ($) — Mark who is speaking in each part of the recording. Every segment gets a speaker (\"Speaker 1\", \"Speaker 2\", …), the transcript is laid out as a conversation, and subtitles carry the names. Charged per minute on top of the transcription, and slow: the speaker model runs on th",
+     "default": false
+    },
+    "speakerCount": {
+     "type": "integer",
+     "description": "Number of speakers — How many people talk in the recording. Leave empty and the Actor works it out on its own; set it when you already know, for example two people in an interview."
+    },
+    "vocabularyHint": {
+     "type": "string",
+     "description": "Vocabulary hint — Names, jargon or spellings that appear in the audio, comma separated. Helps the engine get proper nouns right."
+    },
+    "includeSegments": {
+     "type": "boolean",
+     "description": "Timed segments — Return every recognised passage with its start time and duration, alongside the full transcript.",
+     "default": true
+    },
+    "chunkForRag": {
+     "type": "boolean",
+     "description": "Split into RAG chunks — Split the transcript into retrieval chunks that keep the timecode where each one starts.",
+     "default": false
+    },
+    "chunkSize": {
+     "type": "integer",
+     "description": "Chunk size (characters) — Target size of one chunk. Chunks break on sentence ends, so real sizes vary.",
+     "default": 1200
+    },
+    "chunkOverlapSeconds": {
+     "type": "integer",
+     "description": "Chunk overlap (seconds) — How many seconds of the previous chunk to repeat at the start of the next one.",
+     "default": 0
+    },
+    "subtitleFormat": {
+     "type": "string",
+     "description": "Subtitle file — Also return a ready-made subtitle file as text.",
+     "enum": [
+      "none",
+      "srt",
+      "vtt"
+     ],
+     "default": "none"
+    },
+    "apiKey": {
+     "type": "string",
+     "description": "🔑 Your own Groq API key ($) — Optional. Supply your own key and the per-minute price drops sharply; you then pay Groq directly for the recognition. Leave empty to use the built-in key with nothing to set up."
+    },
+    "maxConcurrency": {
+     "type": "integer",
+     "description": "⚡ Max concurrency — How many files to transcribe at the same time.",
+     "default": 3
+    },
+    "maxFileSizeMb": {
+     "type": "integer",
+     "description": "📦 Max file size (MB) — Files larger than this are skipped with an error row instead of being downloaded.",
+     "default": 500
+    },
+    "timeoutPerFileSecs": {
+     "type": "integer",
+     "description": "⏱️ Timeout per file (seconds) — How long one file may take to download and recognise before it is given up on.",
+     "default": 600
+    }
+   },
+   "required": []
+  }
+ },
+ {
+  "name": "tiktok-reels-shorts-transcript-scraper",
+  "actor": "lergassy~tiktok-reels-shorts-transcript-scraper",
+  "description": "YouTube Shorts, TikTok & Reels Transcript Scraper. One run for all three platforms: YouTube Shorts, TikTok and Instagram Reels turned into text — transcript with timestamps, on-screen captions and the first-3-second hook. Shorts use YouTube's own captions, so they cost less. Links or whole profiles, no login.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "videoUrls": {
+     "type": "array",
+     "description": "🔗 TikTok, Reels or Shorts URLs — Add one or more public video URLs — TikTok (tiktok.com/@user/video/...), Instagram Reels (instagram.com/reel/...) and YouTube Shorts. A profile link pasted here is understood too. No login or cookies needed.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "compareWithAuthor": {
+     "type": "boolean",
+     "description": "📈 Find viral videos (compare with the author's usual) — Adds author, views, likes, comments, caption and publish date to every video, and when you send 4 or more videos from the same author it compares each one with that author's median (vsAuthorMedian: 5 means five times the author's usual). Video",
+     "default": true
+    },
+    "profiles": {
+     "type": "array",
+     "description": "👤 Whole profiles — Give a TikTok handle (@duolingo) or just the username (duolingo), a TikTok profile link or a YouTube channel, and the Actor takes its latest videos — no need to collect links by hand. Instagram profiles need a login and are not supported; paste Reel URLs above instead.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "resultsLimitPerProfile": {
+     "type": "integer",
+     "description": "🔢 Videos per profile — How many of the newest videos to take from each profile.",
+     "default": 10
+    },
+    "onlyPostsNewerThan": {
+     "type": "string",
+     "description": "📅 Only videos newer than — Skip anything published before this date. Leave empty to take the newest videos whatever their date."
+    },
+    "transcriptionMode": {
+     "type": "string",
+     "description": "🎧 Transcription strategy — Captions first is the default: when TikTok has its own subtitles for a video, they are used as the transcript (fast, and they keep every repeated line, which speech recognition tends to drop on short clips); videos without subtitles, and all Instagram Reels, go to speech ",
+     "enum": [
+      "ai-only",
+      "captions-first",
+      "captions-only"
+     ],
+     "default": "captions-first"
+    },
+    "includeOnScreenText": {
+     "type": "boolean",
+     "description": "🖼️ Read on-screen text — Read the text burned into the picture — caption cards, title cards, hard subtitles — and split it from what the author actually says. No other Actor does this. It downloads the video and reads it frame by frame, so it is billed separately and takes several minutes per video",
+     "default": false
+    },
+    "aiAnalysis": {
+     "type": "boolean",
+     "description": "🤖 AI script breakdown ($) — Break each video down with AI: hook and why it works, beats with what is on screen, call to action, topic, format, audience, emotion and a reusable script template. The model (DeepSeek V4.1 Flash) looks at frames taken every 2 seconds (at most 12 per video) together with",
+     "default": false
+    },
+    "quality": {
+     "type": "string",
+     "description": "🎯 Speech recognition quality — Only used when a video has no captions of its own. Fast is enough for clear speech in short video; accurate helps with noise, accents and music.",
+     "enum": [
+      "fast",
+      "balanced",
+      "accurate"
+     ],
+     "default": "fast"
+    },
+    "language": {
+     "type": "string",
+     "description": "🗣️ Spoken language — Leave on Auto unless the video is short and the language is being guessed wrong.",
+     "enum": [
+      "auto",
+      "en",
+      "es",
+      "pt",
+      "fr",
+      "de",
+      "it",
+      "nl",
+      "hi",
+      "ar",
+      "ja",
+      "ko",
+      "zh",
+      "ru",
+      "tr",
+      "id",
+      "vi",
+      "th",
+      "pl",
+      "uk"
+     ],
+     "default": "auto"
+    },
+    "maximumVideoDurationSeconds": {
+     "type": "integer",
+     "description": "⏳ Maximum video duration, seconds — Videos longer than this are skipped with a free error row, before anything is downloaded. 0 means no limit. Useful when a profile mixes Shorts with hour-long uploads.",
+     "default": 0
+    },
+    "ocrFps": {
+     "type": "string",
+     "description": "🖼️ On-screen text sampling — How often frames are read when “Read on-screen text” is on. On our labelled test video 1.5 frames per second found every caption card, while 1 lost three of six. Higher values cost more time, not more accuracy.",
+     "enum": [
+      "1",
+      "1.5",
+      "2",
+      "3"
+     ],
+     "default": "1.5"
+    },
+    "includeTranscriptSegments": {
+     "type": "boolean",
+     "description": "⏱️ Include timestamped segments — Return the transcript as timestamped segments in addition to the plain text. Turn off for a flatter table.",
+     "default": true
+    }
+   },
+   "required": []
+  }
+ },
+ {
+  "name": "instagram-reels-transcript-scraper",
+  "actor": "lergassy~instagram-reels-transcript-scraper",
+  "description": "Instagram Reels Transcript Scraper — from $7.5/1K. Instagram Reels, TikTok and YouTube Shorts to text: speech-to-text transcript with timestamps, burned-in captions, the 3-second hook, likes, views and a viral score vs the author's usual. No login. Watch creators on a schedule and pay only for new videos. Failed and private videos are free.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "videoUrls": {
+     "type": "array",
+     "description": "🔗 Instagram Reel URLs — Add one or more public Reel links (instagram.com/reel/...). No login or cookies needed. TikTok and YouTube Shorts links also work, if you happen to have them in the same list.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "compareWithAuthor": {
+     "type": "boolean",
+     "description": "📈 Find viral videos (compare with the author's usual) — Adds author, views, likes, comments, caption and publish date to every video, and when you send 4 or more videos from the same author it compares each one with that author's median (vsAuthorMedian: 5 means five times the author's usual). Video",
+     "default": true
+    },
+    "profiles": {
+     "type": "array",
+     "description": "👤 Instagram, TikTok or YouTube profiles — An Instagram profile link (https://www.instagram.com/natgeo/) or username (natgeo), a TikTok handle with @ (@duolingo) or a YouTube channel. Instagram shows logged-out visitors only the 12 newest Reels of a profile, so that is the most an Instagram profile ",
+     "items": {
+      "type": "string"
+     }
+    },
+    "resultsLimitPerProfile": {
+     "type": "integer",
+     "description": "🔢 Videos per profile — How many of the newest videos to take from each profile. Instagram profiles give at most 12 (all Instagram shows without a login).",
+     "default": 10
+    },
+    "onlyPostsNewerThan": {
+     "type": "string",
+     "description": "📅 Only videos newer than — Skip anything published before this date. Leave empty to take the newest videos whatever their date."
+    },
+    "onlyNewVideos": {
+     "type": "boolean",
+     "description": "🆕 Only videos not processed before (pay only for new ones) — For scheduled runs: remembers the videos this account has already transcribed and skips them free of charge, so a daily watch on a creator only pays for what was published since the last run. The memory lives in your own key-value store '",
+     "default": false
+    },
+    "maxVideos": {
+     "type": "integer",
+     "description": "🔢 Maximum videos in this run (all inputs together) — A hard ceiling for the whole run, across links and profiles together. Useful when you paste a long list or several profiles and want a predictable bill. Leave empty for no ceiling; the per-profile limit still applies."
+    },
+    "includeRunSummary": {
+     "type": "boolean",
+     "description": "🧾 Add a free summary row at the end of the run — One extra free row with the run's totals: how many videos were asked for, transcribed, skipped as already processed, skipped by the ceiling, and how many failed with the reason counts. Handy for scheduled runs and dashboards.",
+     "default": false
+    },
+    "watchlistName": {
+     "type": "string",
+     "description": "🗂️ Name of the watch list (with “only new videos”) — Keeps separate memories of what was already processed. Give each scheduled task its own name — for example 'competitors' and 'my-brand' — and they will not skip each other's videos. Empty means one shared list."
+    },
+    "maxRunSeconds": {
+     "type": "integer",
+     "description": "⏲️ Stop the run after N seconds — A soft deadline: when it passes, no new video is taken, everything already transcribed is delivered and the run ends green with an explanation. Nothing is charged for videos that were not taken."
+    },
+    "fromDatasetId": {
+     "type": "string",
+     "description": "🔗 Take video links from another run's dataset — Dataset of a previous run (yours or another Actor's). Every row is scanned for an Instagram, TikTok or YouTube link in the usual fields (url, postUrl, videoUrl, link, shortCode) and those videos are transcribed. Lets you chain a scraper to this Actor "
+    },
+    "datasetItems": {
+     "type": "array",
+     "description": "📋 Or paste the rows themselves — Rows from another Actor as JSON, when you do not want to share a dataset. The same fields are scanned for video links. Works together with the dataset field above.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "transcriptionMode": {
+     "type": "string",
+     "description": "🎧 Transcription strategy — Instagram Reels never carry captions of their own, so on this Actor the transcript almost always comes from speech recognition. Captions first is the default and the right choice here: it looks for captions, finds none on a Reel, and recognises the speech. Speech recognit",
+     "enum": [
+      "ai-only",
+      "captions-first",
+      "captions-only"
+     ],
+     "default": "captions-first"
+    },
+    "includeOnScreenText": {
+     "type": "boolean",
+     "description": "🖼️ Read on-screen text — Read the text burned into the picture — caption cards, title cards, hard subtitles — and split it from what the author actually says. No other Actor does this. It downloads the video and reads it frame by frame, so it is billed separately and takes several minutes per video",
+     "default": false
+    },
+    "aiAnalysis": {
+     "type": "boolean",
+     "description": "🤖 AI script breakdown ($) — Break each video down with AI: hook and why it works, beats with what is on screen, call to action, topic, format, audience, emotion and a reusable script template. The model (DeepSeek V4.1 Flash) looks at frames taken every 2 seconds (at most 12 per video) together with",
+     "default": false
+    },
+    "quality": {
+     "type": "string",
+     "description": "🎯 Speech recognition quality — Only used when a video has no captions of its own. Fast is enough for clear speech in short video; accurate helps with noise, accents and music.",
+     "enum": [
+      "fast",
+      "balanced",
+      "accurate"
+     ],
+     "default": "fast"
+    },
+    "language": {
+     "type": "string",
+     "description": "🗣️ Spoken language — Leave on Auto unless the video is short and the language is being guessed wrong.",
+     "enum": [
+      "auto",
+      "en",
+      "es",
+      "pt",
+      "fr",
+      "de",
+      "it",
+      "nl",
+      "hi",
+      "ar",
+      "ja",
+      "ko",
+      "zh",
+      "ru",
+      "tr",
+      "id",
+      "vi",
+      "th",
+      "pl",
+      "uk"
+     ],
+     "default": "auto"
+    },
+    "maximumVideoDurationSeconds": {
+     "type": "integer",
+     "description": "⏳ Maximum video duration, seconds — Videos longer than this are skipped with a free error row, before anything is downloaded. 0 means no limit. Useful when a profile mixes Shorts with hour-long uploads.",
+     "default": 0
+    },
+    "ocrFps": {
+     "type": "string",
+     "description": "🖼️ On-screen text sampling — How often frames are read when “Read on-screen text” is on. On our labelled test video 1.5 frames per second found every caption card, while 1 lost three of six. Higher values cost more time, not more accuracy.",
+     "enum": [
+      "1",
+      "1.5",
+      "2",
+      "3"
+     ],
+     "default": "1.5"
+    },
+    "includeTranscriptSegments": {
+     "type": "boolean",
+     "description": "⏱️ Include timestamped segments — Return the transcript as timestamped segments in addition to the plain text. Turn off for a flatter table.",
+     "default": true
+    }
+   },
+   "required": []
+  }
+ },
+ {
+  "name": "meta-ad-library-scraper",
+  "actor": "lergassy~meta-ad-library-scraper",
+  "description": "Meta Ad Library Scraper. Scrape Facebook and Instagram ads from Meta's Ad Library by keyword or advertiser page: ad text, headline, call to action, link, image and video URLs, format, platforms and run dates. One flat row per ad, with a hard cap. Export data, run via API, schedule runs.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "queries": {
+     "type": "array",
+     "description": "🔍 Search keywords — Words or brand names to search the Ad Library for, one per line. Every ad whose text, advertiser or link matches is returned.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "pageIds": {
+     "type": "array",
+     "description": "📄 Facebook page IDs — Numeric page IDs to pull every ad of one advertiser, instead of searching by keyword. The ID is the number in an ad's Ad Library link, and it is also returned as pageId on every row.",
+     "default": [],
+     "items": {
+      "type": "string"
+     }
+    },
+    "country": {
+     "type": "string",
+     "description": "🌍 Country — Two-letter country code of the audience the ads were shown to, for example US, GB, DE. Meta indexes ads per country, so this changes which ads exist, not just how they are filtered.",
+     "default": "US"
+    },
+    "activeStatus": {
+     "type": "string",
+     "description": "🟢 Ad status — Whether to return ads that are still running, ads that have stopped, or both.",
+     "enum": [
+      "active",
+      "inactive",
+      "all"
+     ],
+     "default": "active"
+    },
+    "adType": {
+     "type": "string",
+     "description": "🗳️ Ad type — All ads, or only the political and social-issue shelf. Meta publishes spend, impressions and reach for that shelf and for nothing else, so the spend, impressionsText and reachEstimate columns only carry numbers here.",
+     "enum": [
+      "all",
+      "political"
+     ],
+     "default": "all"
+    },
+    "mediaType": {
+     "type": "string",
+     "description": "🖼️ Media type — Keep only ads of one format. Meta applies this itself, so it changes which ads are fetched and therefore what you pay for.",
+     "enum": [
+      "all",
+      "image",
+      "video",
+      "meme",
+      "none"
+     ],
+     "default": "all"
+    },
+    "platforms": {
+     "type": "array",
+     "description": "📱 Platforms — Limit to ads shown on particular Meta surfaces. Leave empty for all of them.",
+     "default": [],
+     "items": {
+      "type": "string",
+      "enum": [
+       "FACEBOOK",
+       "INSTAGRAM",
+       "MESSENGER",
+       "AUDIENCE_NETWORK",
+       "THREADS"
+      ],
+      "enumTitles": [
+       "Facebook",
+       "Instagram",
+       "Messenger",
+       "Audience Network",
+       "Threads"
+      ]
+     }
+    },
+    "startDate": {
+     "type": "string",
+     "description": "📅 Ads started after — Only ads that began running on or after this date, as YYYY-MM-DD."
+    },
+    "endDate": {
+     "type": "string",
+     "description": "📅 Ads started before — Only ads that began running on or before this date, as YYYY-MM-DD."
+    },
+    "maxAds": {
+     "type": "integer",
+     "description": "💯 Maximum ads — Hard cap for the whole run. It is checked before every request, so the run stops at this number and never bills you past it.",
+     "default": 30
+    },
+    "maxAdsPerQuery": {
+     "type": "integer",
+     "description": "Maximum ads per keyword or page — Optional per-target cap, so one broad keyword cannot eat the whole run."
+    },
+    "proxyConfiguration": {
+     "type": "object",
+     "description": "Proxy — Meta serves the Ad Library to residential addresses only; from a datacentre address it answers with an empty response. Leave this on the default unless you know why you are changing it.",
+     "default": {
+      "useApifyProxy": true,
+      "apifyProxyGroups": [
+       "RESIDENTIAL"
+      ],
+      "apifyProxyCountry": "US"
+     },
+     "additionalProperties": true
+    }
+   },
+   "required": []
+  }
+ },
+ {
+  "name": "au-grocery-scraper",
+  "actor": "lergassy~au-grocery-scraper",
+  "description": "Coles, Woolworths & ALDI Scraper. Scrape Australian grocery prices from Coles, Woolworths and ALDI in one run: price, was-price, discount, unit price, stock, category, ingredients and nutrition. Compare the three chains on one row, watch price changes, or list stores near a postcode.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "keywords": {
+     "type": "array",
+     "description": "🔎 What to look up — Products to look up in every selected chain — milk, nappies, tim tam, olive oil. Each keyword is searched in Coles, Woolworths and ALDI and comes back in one table.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "categories": {
+     "type": "array",
+     "description": "📂 Category pages — Whole aisles instead of a keyword. Paste a Coles category link such as https://www.coles.com.au/browse/dairy-eggs-fridge/milk, or an ALDI category key such as 970000000. Woolworths does not answer category requests from an anonymous visitor, so use keywords for it.",
+     "default": [],
+     "items": {
+      "type": "string"
+     }
+    },
+    "chains": {
+     "type": "array",
+     "description": "🏪 Chains — Which supermarkets to read. Leave all three on to compare them.",
+     "default": [
+      "coles",
+      "woolworths",
+      "aldi"
+     ],
+     "items": {
+      "type": "string",
+      "enum": [
+       "coles",
+       "woolworths",
+       "aldi"
+      ],
+      "enumTitles": [
+       "Coles",
+       "Woolworths",
+       "ALDI"
+      ]
+     }
+    },
+    "output": {
+     "type": "string",
+     "description": "📤 What a row should be — One product per row gives every product of every chain separately. One comparison per row puts the same product from the different chains on one row with the Coles, Woolworths and ALDI price next to each other and names the cheapest. One store per row lists the Coles, Woolw",
+     "enum": [
+      "products",
+      "comparison",
+      "stores"
+     ],
+     "default": "products"
+    },
+    "maxProductsPerKeyword": {
+     "type": "integer",
+     "description": "💯 Products per keyword, per chain — How deep to go in each chain for each keyword. Thirty is a fast look; raise it to sweep a whole aisle.",
+     "default": 30
+    },
+    "productUrls": {
+     "type": "array",
+     "description": "🔗 Product URLs — Specific products instead of, or alongside, a search. Paste Coles, Woolworths or ALDI product links — the chain is recognised from the link.",
+     "default": [],
+     "items": {
+      "type": "string"
+     }
+    },
+    "postcode": {
+     "type": "string",
+     "description": "📍 Postcode — An Australian postcode, used to find Coles, Woolworths and ALDI stores near it in the store mode. Coordinates can be given instead.",
+     "default": ""
+    },
+    "latitude": {
+     "type": "string",
+     "description": "Latitude — Coordinates instead of a postcode, e.g. -33.8688. Both latitude and longitude must be given.",
+     "default": ""
+    },
+    "longitude": {
+     "type": "string",
+     "description": "Longitude — The matching longitude, e.g. 151.2093.",
+     "default": ""
+    },
+    "colesStoreId": {
+     "type": "string",
+     "description": "🏬 Coles store number — Set it and Coles rows come back with the aisle the product sits in and the quantity that store has on the shelf, instead of the national range. The number is in the URL of your store on the Coles site.",
+     "default": ""
+    },
+    "includeNutrition": {
+     "type": "boolean",
+     "description": "🥗 Ingredients, allergens and nutrition — Woolworths ships the label with the product and it is always included. Coles keeps it on the product page, so each Coles product needs one extra request, charged as a separate add-on. ALDI publishes no label data at all.",
+     "default": false
+    },
+    "maxNutritionLookups": {
+     "type": "integer",
+     "description": "Maximum label lookups per run — A ceiling on the extra Coles requests, so a large sweep cannot surprise you.",
+     "default": 200
+    },
+    "watchName": {
+     "type": "string",
+     "description": "🔔 Watch name — deliver only what changed — Give this run a name — weekly-shop, dairy — and every later run under the same name returns only products whose price moved, that went on or off special, that came back in stock, or that are new. Leave empty to get everything found, every time.",
+     "default": ""
+    },
+    "deliverBaseline": {
+     "type": "boolean",
+     "description": "📥 Deliver everything on the first run of a watch — The first run of a new watch has nothing to compare against. Leave this on to receive the current prices as the starting point; turn it off to start silently and hear only about movements from now on.",
+     "default": true
+    },
+    "resetWatch": {
+     "type": "boolean",
+     "description": "♻️ Forget the prices this watch remembers — Wipe this watch's memory and start a new baseline on this run.",
+     "default": false
+    },
+    "onSpecialOnly": {
+     "type": "boolean",
+     "description": "🏷️ Only products on special — Keep only products with a was-price or a special flag.",
+     "default": false
+    },
+    "minDiscountPercent": {
+     "type": "integer",
+     "description": "📉 Minimum discount, % — Keep only products discounted by at least this much. Zero means no minimum.",
+     "default": 0
+    },
+    "maxPrice": {
+     "type": "integer",
+     "description": "💲 Maximum price, AUD — Ignore anything dearer than this. Zero means no limit.",
+     "default": 0
+    },
+    "inStockOnly": {
+     "type": "boolean",
+     "description": "📦 Only what is in stock — Drop products the chain reports as unavailable.",
+     "default": false
+    },
+    "matchMode": {
+     "type": "string",
+     "description": "🔗 How strictly to match products across chains — Same brand only ever compares like with like: the same brand, or the three house brands against each other (Coles, Woolworths, ALDI's Farmdale and friends). Equivalent also matches a different brand of the same size and wording — wider, and every row",
+     "enum": [
+      "same-brand",
+      "equivalent"
+     ],
+     "default": "same-brand"
+    },
+    "maxItems": {
+     "type": "integer",
+     "description": "Maximum rows per run — A hard ceiling on what one run delivers and bills.",
+     "default": 5000
+    },
+    "concurrency": {
+     "type": "integer",
+     "description": "Parallel requests — How many chain requests to run at once.",
+     "default": 3
+    },
+    "proxyConfiguration": {
+     "type": "object",
+     "description": "Proxy configuration — Apify Proxy is on by default with residential addresses, because Coles often refuses datacenter traffic (on 16 September 2026 it stopped answering the datacenter pool altogether). With this default the Actor still tries the cheaper datacenter pool first and moves a site to resi",
+     "default": {
+      "useApifyProxy": true,
+      "apifyProxyGroups": [
+       "RESIDENTIAL"
+      ]
+     },
+     "additionalProperties": true
+    }
+   },
+   "required": []
+  }
+ },
+ {
+  "name": "sports-odds-api",
+  "actor": "lergassy~sports-odds-api",
+  "description": "Sports Betting Odds API — Pinnacle, DraftKings & Arbitrage. Moneyline, spread and total odds per book — Pinnacle sharp lines with the risk limit it accepts, DraftKings, Kalshi — plus arbitrage and value bets calculated across books, opening lines, props and futures. NFL, NBA, MLB, NHL, college, soccer, UFC, tennis. No API key.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "mode": {
+     "type": "string",
+     "description": "🧭 What to get — Odds — moneyline, spread and total for every game, per book, with opening lines and movement. Props — player and game props from DraftKings for every game. Futures — championship, division, award and season-win markets. Prediction markets — Kalshi game contracts with traded probabil",
+     "enum": [
+      "odds",
+      "props",
+      "futures",
+      "prediction-markets",
+      "leagues"
+     ],
+     "default": "odds"
+    },
+    "leagues": {
+     "type": "array",
+     "description": "🏆 Leagues — One or more leagues. Odds, props and Kalshi contracts are matched game by game. For a league that is not in this list, put its ESPN path (for example soccer/eng.2) in Custom leagues below.",
+     "default": [
+      "nfl",
+      "nba",
+      "mlb",
+      "epl"
+     ],
+     "items": {
+      "type": "string",
+      "enum": [
+       "nfl",
+       "ncaaf",
+       "nba",
+       "wnba",
+       "ncaam",
+       "ncaaw",
+       "mlb",
+       "nhl",
+       "epl",
+       "laliga",
+       "bundesliga",
+       "seriea",
+       "ligue1",
+       "ucl",
+       "uel",
+       "mls",
+       "ligamx",
+       "eredivisie",
+       "brasileirao",
+       "worldcup",
+       "facup",
+       "atp",
+       "wta",
+       "ufc",
+       "pfl",
+       "f1",
+       "nascar",
+       "indycar"
+      ],
+      "enumTitles": [
+       "NFL",
+       "NCAA football",
+       "NBA",
+       "WNBA",
+       "NCAA men's basketball",
+       "NCAA women's basketball",
+       "MLB",
+       "NHL",
+       "Premier League",
+       "La Liga",
+       "Bundesliga",
+       "Serie A",
+       "Ligue 1",
+       "Champions League",
+       "Europa League",
+       "MLS",
+       "Liga MX",
+       "Eredivisie",
+       "Brasileirão",
+       "FIFA World Cup",
+       "FA Cup",
+       "ATP tennis",
+       "WTA tennis",
+       "UFC",
+       "PFL",
+       "Formula 1",
+       "NASCAR",
+       "IndyCar"
+      ]
+     }
+    },
+    "customLeagues": {
+     "type": "array",
+     "description": "Custom leagues (ESPN paths) — Any ESPN league path not in the list above, e.g. soccer/eng.2 (Championship), soccer/ger.2, basketball/nbl. The game list comes from ESPN; DraftKings, Pinnacle and Kalshi prices are added when they carry that league.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "daysAhead": {
+     "type": "integer",
+     "description": "📅 Days ahead — Games from today (UTC) up to this many days ahead (ignored when dates are set below). 0 = today only.",
+     "default": 7
+    },
+    "dateFrom": {
+     "type": "string",
+     "description": "📅 From date — YYYY-MM-DD, UTC. Optional. Games are kept by their kick-off time in UTC."
+    },
+    "dateTo": {
+     "type": "string",
+     "description": "📅 To date — YYYY-MM-DD, UTC. Optional; at most 60 days after the start."
+    },
+    "markets": {
+     "type": "array",
+     "description": "📊 Markets — Odds mode: which game lines to output. Spread is the run line in MLB and the puck line in NHL; soccer moneylines carry a draw price.",
+     "default": [
+      "moneyline",
+      "spread",
+      "total"
+     ],
+     "items": {
+      "type": "string",
+      "enum": [
+       "moneyline",
+       "spread",
+       "total"
+      ],
+      "enumTitles": [
+       "Moneyline (winner)",
+       "Spread / run line / puck line",
+       "Total (over/under)"
+      ]
+     }
+    },
+    "books": {
+     "type": "array",
+     "description": "📚 Sources — Pinnacle — the sharp reference book the rest of the market prices against, with the risk limit it will accept on each market. DraftKings — live prices straight from the sportsbook feed. ESPN — every provider ESPN carries for the game (DraftKings, Bet365 where present) with opening lines",
+     "default": [
+      "draftkings",
+      "pinnacle",
+      "espn",
+      "kalshi"
+     ],
+     "items": {
+      "type": "string",
+      "enum": [
+       "draftkings",
+       "pinnacle",
+       "espn",
+       "kalshi"
+      ],
+      "enumTitles": [
+       "DraftKings (direct feed)",
+       "Pinnacle (sharp line + risk limits)",
+       "ESPN providers with opening lines",
+       "Kalshi prediction market"
+      ]
+     }
+    },
+    "oddsFormat": {
+     "type": "string",
+     "description": "🔢 Odds format — How the homePrice/awayPrice/overPrice… fields are written. Decimal odds and implied probabilities are always included as separate fields.",
+     "enum": [
+      "american",
+      "decimal",
+      "fractional",
+      "implied"
+     ],
+     "default": "american"
+    },
+    "outputFormat": {
+     "type": "string",
+     "description": "🧱 Row layout — Flat — one row per game × market × book, spreadsheet-friendly. Nested — one row per game with all books inside and the best price per outcome.",
+     "enum": [
+      "flat",
+      "nested"
+     ],
+     "default": "flat"
+    },
+    "includeOpeningLines": {
+     "type": "boolean",
+     "description": "📈 Opening lines and movement — Fetch the opening line and price for each game (one extra request per game) and compute how far the line and prices have moved.",
+     "default": true
+    },
+    "includeAlternateLines": {
+     "type": "boolean",
+     "description": "➕ Alternate spreads and totals — Add DraftKings' alternate lines as extra rows (market alternate-spread / alternate-total).",
+     "default": false
+    },
+    "includeFinished": {
+     "type": "boolean",
+     "description": "🏁 Include finished games — Odds mode: keep games that are already final (closing lines, if a source still carries them). Prediction-markets mode: keep settled contracts.",
+     "default": false
+    },
+    "includeEdges": {
+     "type": "boolean",
+     "description": "💰 Find arbitrage and value bets — Adds edge rows on top of the prices: arbitrage — the best price on each side, taken from whichever book offers it, when together they guarantee a profit; value — a book paying more than Pinnacle’s vig-free probability says the outcome deserves. Needs at least two s",
+     "default": true
+    },
+    "minEdgePercent": {
+     "type": "integer",
+     "description": "📉 Smallest edge worth reporting, % — Prices move by a tick constantly, so anything under half a percent is noise a bettor would pay away in the spread. Raise it to see only the big disagreements.",
+     "default": 1
+    },
+    "eventIds": {
+     "type": "array",
+     "description": "🎯 Only these games — ESPN event ids (the eventId field of any row, or the number in an ESPN game URL). Leave empty for every game in the date range.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "propCategories": {
+     "type": "array",
+     "description": "🧑‍🤝‍🧑 Prop categories — Props mode: keep only categories whose name contains one of these, e.g. Passing, TD Scorers, Points, Batter. Empty = every player and game prop category (this can be thousands of rows per game).",
+     "items": {
+      "type": "string"
+     }
+    },
+    "maxPropsPerGame": {
+     "type": "integer",
+     "description": "Props per game cap — Stop after this many prop rows for one game.",
+     "default": 500
+    },
+    "futuresCategories": {
+     "type": "array",
+     "description": "🏆 Futures categories — Futures mode: keep only categories whose name contains one of these, e.g. Futures, Awards, Wins, Playoffs. Empty = every futures-type category.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "kalshiSeries": {
+     "type": "array",
+     "description": "🎲 Kalshi series tickers — Prediction-markets mode: series tickers to pull directly, e.g. KXNFLGAME, KXUCLGAME, KXATPMATCH. Leagues selected above are added automatically.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "maxItems": {
+     "type": "integer",
+     "description": "💯 Maximum rows — Stop after this many rows in the run. The default of 18 keeps a first trial run at about $0.05 — raise it once you like the output.",
+     "default": 18
+    },
+    "concurrency": {
+     "type": "integer",
+     "description": "Parallel requests — How many requests run at once.",
+     "default": 6
+    },
+    "proxyConfiguration": {
+     "type": "object",
+     "description": "Proxy configuration — Not needed: every source answers Apify's own servers directly. Set only if a source starts refusing. Leave it off unless a source starts refusing you: DraftKings answers Apify's own servers but blocks datacenter proxies, so switching the proxy on can cost you its prices rather ",
+     "default": {
+      "useApifyProxy": false
+     },
+     "additionalProperties": true
+    },
+    "includeRunSummary": {
+     "type": "boolean",
+     "description": "🧾 Add a free summary row at the end of the run — One extra free row with the run's totals: rows delivered, free rows, what was charged and how much in US dollars. It carries type \"notice\", so a filter on your data rows skips it.",
+     "default": true
+    }
+   },
+   "required": []
+  }
+ },
+ {
+  "name": "tennis-scores-api",
+  "actor": "lergassy~tennis-scores-api",
+  "description": "Tennis Scraper & Scores API — ATP, WTA, Live, Stats. Tennis scraper on SofaScore data: live scores, schedules, results, match statistics, point by point, betting odds, ATP and WTA rankings, player profiles and draws for ATP, WTA, Challenger, ITF and UTR. One flat row per match. Export to CSV or JSON, run via API, schedule, or call from AI agents.",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "mode": {
+     "type": "string",
+     "description": "🎾 What to get — Schedule: every match in a date window — upcoming, live and played — for the tours you pick. Live: only what is on court right now. Results: completed matches with scores and winners, newest first. Match: one named match with optional statistics, point-by-point and head-to-head. Pla",
+     "enum": [
+      "schedule",
+      "live",
+      "results",
+      "match",
+      "player",
+      "search",
+      "rankings",
+      "wtaMatches",
+      "wtaRankings",
+      "wtaPlayers",
+      "wtaTournaments"
+     ],
+     "default": "schedule"
+    },
+    "dateFrom": {
+     "type": "string",
+     "description": "📅 Date — Day to list matches for, YYYY-MM-DD in UTC. Leave empty for today. Only a rolling window of roughly two months around today is available from this source."
+    },
+    "daysBack": {
+     "type": "integer",
+     "description": "⬅️ Days back — How many days before the date to include (0–14). Use 1 in Results mode to get yesterday's finished matches as well as today's.",
+     "default": 0
+    },
+    "days": {
+     "type": "integer",
+     "description": "➡️ Days ahead — How many days after the date to include (0 = that day only, up to 14). Use 6 for a whole tournament week.",
+     "default": 0
+    },
+    "tours": {
+     "type": "array",
+     "description": "🏆 Tours — Which circuits to keep. ATP and WTA are preselected because they are what most buyers want and they keep a run small; the Challenger and ITF levels add several hundred matches a day. Grand Slams appear under ATP and WTA. One request covers the whole day whatever you pick here, so narrowin",
+     "default": [
+      "atp",
+      "wta"
+     ],
+     "items": {
+      "type": "string",
+      "enum": [
+       "atp",
+       "wta",
+       "challenger",
+       "challenger_women",
+       "itf_men",
+       "itf_women",
+       "davis_cup",
+       "bjk_cup",
+       "united_cup",
+       "exhibition",
+       "all"
+      ],
+      "enumTitles": [
+       "ATP (incl. Grand Slams, men)",
+       "WTA (incl. Grand Slams, women)",
+       "ATP Challenger",
+       "WTA 125 / Challenger women",
+       "ITF men",
+       "ITF women",
+       "Davis Cup",
+       "Billie Jean King Cup",
+       "United Cup",
+       "Exhibition",
+       "Every tour"
+      ]
+     }
+    },
+    "status": {
+     "type": "string",
+     "description": "🎯 Keep only — Filter by state. Played keeps everything that produced a result, including retirements and walkovers — the row's own status column says which it was. Not played is the opposite: cancelled, postponed, interrupted.",
+     "enum": [
+      "any",
+      "upcoming",
+      "live",
+      "finished",
+      "notPlayed"
+     ],
+     "default": "any"
+    },
+    "matchType": {
+     "type": "string",
+     "description": "👥 Singles or doubles — Doubles rows carry both partners in homePartners / awayPartners.",
+     "enum": [
+      "all",
+      "singles",
+      "doubles"
+     ],
+     "default": "all"
+    },
+    "playerName": {
+     "type": "string",
+     "description": "🔎 Only matches of a player — Keep only matches where a player's name contains this text, e.g. Sinner. Used by schedule, live, results and player modes. A surname is enough."
+    },
+    "matchIds": {
+     "type": "array",
+     "description": "🆔 Match ids or URLs (match mode) — FlashScore match ids such as pnSMQFtQ, or the match URLs they come from. Ids are in the matchId column of any schedule or results run. They can only be looked up while the match is inside the source's rolling week.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "playerIds": {
+     "type": "array",
+     "description": "🧑 Player ids (player and WTA modes) — Player ids from the homePlayerId / awayPlayerId columns, or numeric WTA ids for the official WTA modes. Use Search mode to find them by name.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "query": {
+     "type": "string",
+     "description": "🔍 Name to search (search mode) — Player name, e.g. Alcaraz. Returns the ids you can paste into the fields above."
+    },
+    "rankingTour": {
+     "type": "string",
+     "description": "🥇 Rankings tour (rankings mode) — Which official ranking to read. Each list comes from that tour's own site, so one failing does not take the other down.",
+     "enum": [
+      "both",
+      "atp",
+      "wta"
+     ],
+     "default": "both"
+    },
+    "rankingDiscipline": {
+     "type": "string",
+     "description": "🥇 Rankings: singles or doubles — Doubles lists can share a rank between two players; such rows carry tied: true and the next rank is skipped, exactly as the tour publishes it.",
+     "enum": [
+      "singles",
+      "doubles"
+     ],
+     "default": "singles"
+    },
+    "rankingTop": {
+     "type": "integer",
+     "description": "🥇 Ranking rows per tour — How many players from the top of each list. One hundred per page, so 100 is one request per tour.",
+     "default": 100
+    },
+    "includeStatistics": {
+     "type": "boolean",
+     "description": "📊 Add match statistics to every match — Aces, double faults, first and second serve, break points, winners, points and games won — for the whole match and per set, around 65 numbers. Available once a match is under way. One extra request and one extra billed row per match.",
+     "default": false
+    },
+    "includePointByPoint": {
+     "type": "boolean",
+     "description": "🎯 Add point-by-point to every match — Every game of every set with its point sequence, who served and who won the game. For modelling and trading; leave off if you only need scores.",
+     "default": false
+    },
+    "includeHeadToHead": {
+     "type": "boolean",
+     "description": "🤝 Add head-to-head to every match — Recent form of both players and their previous meetings, grouped by surface. This is the heaviest extra — well over a hundred kilobytes per match — so use it on a short list, not a whole day.",
+     "default": false
+    },
+    "maxMatches": {
+     "type": "integer",
+     "description": "💯 Maximum rows per run — Safety cap across every mode, and the main control over what a run costs. Fifty rows of ATP and WTA is a normal day.",
+     "default": 50
+    },
+    "maxMatchesPerPlayer": {
+     "type": "integer",
+     "description": "Matches per player (player and WTA modes) — How many of a player's matches to return. In player mode the search walks back day by day, so a wider Days back finds more.",
+     "default": 20
+    },
+    "concurrency": {
+     "type": "integer",
+     "description": "Parallel requests — How many requests to run at once. Three is gentle and enough for a day of matches; raise it only when the extras are on for a long list.",
+     "default": 3
+    },
+    "proxyConfiguration": {
+     "type": "object",
+     "description": "Proxy configuration — Off by default, on purpose. This source answers ordinary datacenter addresses, and one day of matches is well over a megabyte — pushing that through residential addresses would cost more in bandwidth than the rows themselves. If a run is ever refused, the Actor retries through ",
+     "default": {
+      "useApifyProxy": false
+     },
+     "additionalProperties": true
+    },
+    "wtaDiscipline": {
+     "type": "string",
+     "description": "🏆 WTA ranking table — Singles or doubles list, used by the WTA official — rankings mode.",
+     "enum": [
+      "singles",
+      "doubles"
+     ],
+     "default": "singles"
+    },
+    "wtaYear": {
+     "type": "integer",
+     "description": "📅 WTA season — Limit the official WTA match history to one season, e.g. 2025. Leave empty for the most recent matches."
+    },
+    "playerNames": {
+     "type": "array",
+     "description": "🔍 WTA player names — Players to look up in the official WTA modes, by name, e.g. Sabalenka. Each name is resolved against the tour's own player list.",
+     "items": {
+      "type": "string"
+     }
+    },
+    "newestFirst": {
+     "type": "boolean",
+     "description": "🆕 Most recent first — In the official WTA match history, start from the latest matches instead of the start of the player's career.",
+     "default": true
+    }
+   },
+   "required": [
+    "mode"
+   ]
+  }
+ }
+]
