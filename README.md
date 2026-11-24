@@ -8,6 +8,8 @@ directly. Every tool is a published Apify Actor that has been running for paying
 subscription, no proxy bill. The run is billed to *your* Apify account, so you see every cent in your
 own console.
 
+[![lergassy/lergassy-agent-tools MCP server](https://glama.ai/mcp/servers/lergassy/lergassy-agent-tools/badges/score.svg)](https://glama.ai/mcp/servers/lergassy/lergassy-agent-tools)
+
 ## Install
 
 Get a token at [console.apify.com → Integrations](https://console.apify.com/settings/integrations).
